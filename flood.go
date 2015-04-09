@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
-	"github.com/kurojishi/govde"
+	"fmt"
 	"log"
 	"net"
+
+	"github.com/kurojishi/govde"
 )
 
 func sendData(conn *govde.ConnectionVde) {
@@ -12,44 +14,38 @@ func sendData(conn *govde.ConnectionVde) {
 		var payload = []byte("skldjaslkcjlak")
 		conn.Send(payload)
 
+		fmt.Println("Sent: ", payload)
 	}
 }
 
 func receiveData(conn *govde.ConnectionVde) {
 	for true {
-		_, err := conn.Receive()
+		payload, err := conn.Receive()
 		if err != nil {
 			log.Fatal(err)
 		}
+		fmt.Println("Received: ", payload)
 	}
 
 }
 
 func main() {
-	var in = flag.String("in", "", "interface that will receive data")
-	var out = flag.String("out", "", "interface that will send data")
+	var in = flag.String("in", "", "address to send the data too")
+	var out = flag.String("out", "", "address to send the data from")
 	var configuration map[string]string
-	outFace, err := net.InterfaceByName(*out)
+	outAddress := net.ParseIP(*out)
+	if outAddress == nil {
+		log.Fatalln("bad output ip address")
+	}
+	OutConnection, err := govde.Connect("TCP", outAddress.String(), configuration)
 	if err != nil {
 		log.Fatal(err)
 	}
-	inFace, err := net.InterfaceByName(*in)
-	if err != nil {
-		log.Fatal(err)
+	inAddress := net.ParseIP(*in)
+	if inAddress == nil {
+		log.Fatalln("bad input ip address")
 	}
-	outAddress, err := outFace.Addrs()
-	if err != nil {
-		log.Fatal(err)
-	}
-	OutConnection, err := govde.Connect("TCP", outAddress[1].String(), configuration)
-	if err != nil {
-		log.Fatal(err)
-	}
-	inAddress, err := inFace.Addrs()
-	if err != nil {
-		log.Fatal(err)
-	}
-	listener, err := govde.Listen("interface", inAddress[1].String(), configuration)
+	listener, err := govde.Listen("interface", inAddress.String(), configuration)
 	if err != nil {
 		log.Fatal(err)
 	}
