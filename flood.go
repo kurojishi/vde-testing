@@ -4,6 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 )
 
 func sendData(adr string) {
@@ -12,10 +17,23 @@ func sendData(adr string) {
 	if err != nil {
 		fmt.Print(err)
 	}
-	_, err = conn.Write(payload)
-
-	fmt.Printf("Sent: ", payload)
+	fmt.Println("sending data")
+	for i := 0; i < 20; i++ {
+		_, err = conn.Write(payload)
+	}
 	conn.Close()
+}
+
+func readPackets(inter string, finished chan bool) {
+	handle, err := pcap.OpenLive(inter, 1600, true, 0)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	packetSource := gopacket.NewPacketSource(handle, layers.LinkTypeEthernet)
+	for packet := range packetSource.Packets() {
+		fmt.Println(packet.Dump())
+	}
+	finished <- true
 }
 
 func receiveData(conn net.Listener, ok chan bool) {
@@ -25,12 +43,13 @@ func receiveData(conn net.Listener, ok chan bool) {
 	if err != nil {
 		fmt.Print(err)
 	}
-	a, err := listenerConnection.Read(payload)
-	fmt.Print(a)
-	if err != nil {
-		fmt.Print(err)
+	for i := 0; i < 20; i++ {
+		_, err := listenerConnection.Read(payload)
+		fmt.Print(payload)
+		if err != nil {
+			fmt.Print(err)
+		}
 	}
-	fmt.Println("Received: ", payload)
 	conn.Close()
 	ok <- true
 
@@ -49,16 +68,18 @@ func main() {
 		fmt.Print(err)
 	}
 	fmt.Println("server started")
-	fmt.Println("connection accepted")
-	//inAddress := net.ParseIP(*in)
-	//if inAddress == nil {
-	//log.Fatalln("bad input ip address")
-	//}
 	ok := make(chan bool)
+	finished := make(chan bool)
+	go readPackets("tap0", finished)
+	time.Sleep(time.Duration(1000))
 	go receiveData(listener, ok)
 	go sendData(*in)
 	x := <-ok
 	if !x {
+		fmt.Println("WTF")
+	}
+	y := <-finished
+	if !y {
 		fmt.Println("WTF")
 	}
 }
