@@ -10,14 +10,9 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func sendData(addr string, out string) {
+func sendData(addr string, ok chan bool) {
 	var payload = []byte("skldjaslkcjlak")
-	localAddr, err := net.ResolveTCPAddr("tcp", out)
-	if err != nil {
-		fmt.Print(err)
-	}
-	dialer := net.Dialer{LocalAddr: localAddr}
-	conn, err := dialer.Dial("tcp", addr)
+	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		fmt.Print(err)
 	}
@@ -26,9 +21,10 @@ func sendData(addr string, out string) {
 		_, err = conn.Write(payload)
 	}
 	conn.Close()
+	ok <- true
 }
 
-func readPackets(inter string, finished chan bool) {
+func readPackets(inter string, ok chan bool) {
 	handle, err := pcap.OpenLive(inter, 1600, true, 0)
 	defer handle.Close()
 	if err != nil {
@@ -37,19 +33,18 @@ func readPackets(inter string, finished chan bool) {
 	packetSource := gopacket.NewPacketSource(handle, layers.LinkTypeEthernet)
 	packetSource.NoCopy = true
 	fmt.Println("catcher ready")
-	for i := 0; i < 20; i++ {
+	for {
 		packet, err := packetSource.NextPacket()
 
 		if err != nil {
 			fmt.Print(err)
 		}
-		fmt.Println(packet.Dump())
-		fmt.Println(i)
+		fmt.Println(string(packet.Data()))
 	}
-	finished <- true
+	ok <- true
 }
 
-func receiveData(conn net.Listener, ok chan bool) {
+func receiveData(conn net.Listener) {
 	fmt.Println("receiver starterd")
 	payload := make([]byte, 14)
 	listenerConnection, err := conn.Accept()
@@ -64,37 +59,36 @@ func receiveData(conn net.Listener, ok chan bool) {
 		}
 	}
 	conn.Close()
-	ok <- true
 
 }
 
 func main() {
-	var in = flag.String("in", "192.168.4.1:5000", "address to send the data too")
-	var out = flag.String("out", "192.168.4.15", "address to send the data from")
-	var sender = flag.Bool("sender", false, "service will be a server")
-	if !*sender {
+	var in = flag.String("in", "192.168.4.2:5000", "address to send the data too")
+	var sender bool
+	flag.BoolVar(&sender, "sender", false, "service will be a server")
+	flag.Parse()
+	if !sender {
 		listener, err := net.Listen("tcp", *in)
-		defer listener.Close()
 		if err != nil {
 			fmt.Print(err)
 		}
 		fmt.Println("server started")
 		ok := make(chan bool)
-		finished := make(chan bool)
-		go readPackets("tap0", finished)
+		go readPackets("tap0", ok)
 		if err != nil {
 			fmt.Print(err)
 		}
-		go receiveData(listener, ok)
-		y := <-finished
-		if !y {
-			fmt.Println("WTF")
-		}
+		go receiveData(listener)
 		x := <-ok
 		if !x {
 			fmt.Println("WTF")
 		}
 	} else {
-		go sendData(*in, *out)
+		ok := make(chan bool)
+		go sendData(*in, ok)
+		x := <-ok
+		if !x {
+			fmt.Println("WTF")
+		}
 	}
 }
