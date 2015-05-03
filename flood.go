@@ -63,12 +63,13 @@ func receiveData(conn net.Listener) {
 }
 
 func main() {
-	var in = flag.String("in", "192.168.4.2:5000", "address to send the data too")
 	var sender bool
-	flag.BoolVar(&sender, "sender", false, "service will be a server")
+	var in string
+	flag.StringVar(&in, "in", "192.168.4.2:5000", "address to send the data too")
+	flag.BoolVar(&sender, "server", false, "service will be a server")
 	flag.Parse()
-	if !sender {
-		listener, err := net.Listen("tcp", *in)
+	if sender {
+		listener, err := net.Listen("tcp", in)
 		if err != nil {
 			fmt.Print(err)
 		}
@@ -85,7 +86,7 @@ func main() {
 		}
 	} else {
 		ok := make(chan bool)
-		go sendData(*in, ok)
+		go sendData(in, ok)
 		x := <-ok
 		if !x {
 			fmt.Println("WTF")
