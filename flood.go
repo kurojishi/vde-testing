@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log"
 	"net"
 
 	"github.com/google/gopacket"
@@ -11,12 +11,12 @@ import (
 )
 
 func sendData(addr string, ok chan bool) {
-	var payload = []byte("skldjaslkcjlak")
+	payload := make([]byte, 4096)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		fmt.Print(err)
+		log.Fatal(err)
 	}
-	fmt.Println("sending data")
+	log.Println("sending data")
 	for i := 0; i < 20; i++ {
 		_, err = conn.Write(payload)
 	}
@@ -24,38 +24,36 @@ func sendData(addr string, ok chan bool) {
 	ok <- true
 }
 
-func readPackets(inter string, ok chan bool) {
-	handle, err := pcap.OpenLive(inter, 1600, true, 0)
+func packetSniffer(inter string, ok chan bool) {
+	handle, err := pcap.OpenLive(inter, 65536, true, 0)
 	defer handle.Close()
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 	}
 	packetSource := gopacket.NewPacketSource(handle, layers.LinkTypeEthernet)
 	packetSource.NoCopy = true
-	fmt.Println("catcher ready")
-	for {
-		packet, err := packetSource.NextPacket()
-
+	log.Println("catcher ready")
+	for packet := range packetSource.Packets() {
 		if err != nil {
-			fmt.Print(err)
+			log.Fatal(err)
 		}
-		fmt.Println(string(packet.Data()))
+		log.Println(packet.Dump())
 	}
 	ok <- true
 }
 
 func receiveData(conn net.Listener) {
-	fmt.Println("receiver starterd")
-	payload := make([]byte, 14)
+	log.Println("receiver starterd")
+	payload := make([]byte, 4096)
 	listenerConnection, err := conn.Accept()
 	if err != nil {
-		fmt.Print(err)
+		log.Fatal(err)
 	}
 	for i := 0; i < 20; i++ {
 		_, err := listenerConnection.Read(payload)
-		fmt.Println(string(payload))
+		log.Println(string(payload))
 		if err != nil {
-			fmt.Print(err)
+			log.Fatal(err)
 		}
 	}
 	conn.Close()
@@ -64,32 +62,34 @@ func receiveData(conn net.Listener) {
 
 func main() {
 	var sender bool
-	var in string
-	flag.StringVar(&in, "in", "192.168.4.2:5000", "address to send the data too")
+	var address string
+	var port string
+	flag.StringVar(&address, "address", "192.168.4.1", "address to send the data too")
+	flag.StringVar(&port, "p", "5000", "starting port")
 	flag.BoolVar(&sender, "server", false, "service will be a server")
 	flag.Parse()
 	if sender {
-		listener, err := net.Listen("tcp", in)
+		listener, err := net.Listen("tcp", address+":"+port)
 		if err != nil {
-			fmt.Print(err)
+			log.Fatal(err)
 		}
-		fmt.Println("server started")
+		log.Println("server started")
 		ok := make(chan bool)
-		go readPackets("tap0", ok)
+		go packetSniffer("tap0", ok)
 		if err != nil {
-			fmt.Print(err)
+			log.Fatal(err)
 		}
 		go receiveData(listener)
 		x := <-ok
 		if !x {
-			fmt.Println("WTF")
+			log.Fatal(err)
 		}
 	} else {
 		ok := make(chan bool)
-		go sendData(in, ok)
+		go sendData(address+":"+port, ok)
 		x := <-ok
 		if !x {
-			fmt.Println("WTF")
+			log.Println("WTF")
 		}
 	}
 }
