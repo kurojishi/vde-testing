@@ -10,7 +10,7 @@ import (
 	"github.com/google/gopacket/tcpassembly"
 )
 
-var statsResults []StatsStream
+var statsResults chan StatsStream
 
 // simpleStreamFactory implements tcpassembly.StreamFactory
 type statsStreamFactory struct{}
@@ -59,12 +59,13 @@ func (s *StatsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
 // ReassemblyComplete is called when the TCP assembler believes a stream has
 // finished.
 func (s *StatsStream) ReassemblyComplete() {
-	statsResults = append(statsResults, *s)
+	statsResults <- *s
 }
 
 //StreamStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
-func StreamStats(iface string, snaplen int32) []StatsStream {
+func StreamStats(iface string, snaplen int32) {
+	log.Printf("starting caputre on %v", iface)
 	handle, err := pcap.OpenLive(iface, snaplen, true, 0)
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
@@ -76,6 +77,8 @@ func StreamStats(iface string, snaplen int32) []StatsStream {
 	streamFactory := &statsStreamFactory{}
 	streamPool := tcpassembly.NewStreamPool(streamFactory)
 	assembler := tcpassembly.NewAssembler(streamPool)
+	assembler.MaxBufferedPagesTotal = 0
+	assembler.MaxBufferedPagesPerConnection = 0
 
 	log.Println("Catching stream stats")
 
@@ -88,24 +91,25 @@ func StreamStats(iface string, snaplen int32) []StatsStream {
 	var udp layers.UDP
 	var payload gopacket.Payload
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &dot1q, &ip4, &ip6, &ip6ext, &tcp, &udp, &payload)
+	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	decoded := make([]gopacket.LayerType, 0, 4)
 
 	var byteCount int64
 
-	for {
-		data, ci, err := handle.ReadPacketData()
-		if err != nil {
-			log.Printf("error getting packet: %v", err)
-			//TODO:comunicate with client and restart
-			continue
-		}
-		err = parser.DecodeLayers(data, &decoded)
+	for packet := range source.Packets() {
+		log.Printf(packet.String())
+		//if err != nil {
+		//log.Printf("error getting packet: %v", err)
+		////TODO:comunicate with client and restart
+		//continue
+		//}
+		err := parser.DecodeLayers(packet.Data(), &decoded)
 		if err != nil {
 			log.Printf("error decoding packet: %v", err)
 			continue
 		}
 
-		byteCount += int64(len(data))
+		byteCount += int64(len(packet.Data()))
 		foundNetLayer := false
 		var netFlow gopacket.Flow
 		for _, typ := range decoded {
@@ -117,12 +121,12 @@ func StreamStats(iface string, snaplen int32) []StatsStream {
 				netFlow = ip6.NetworkFlow()
 				foundNetLayer = true
 			case layers.LayerTypeTCP:
+				log.Println("Found TCP layer")
 				if foundNetLayer {
-					assembler.AssembleWithTimestamp(netFlow, &tcp, ci.Timestamp)
+					assembler.Assemble(netFlow, &tcp)
 				}
 			}
 		}
 	}
 	assembler.FlushAll()
-	return statsResults
 }
