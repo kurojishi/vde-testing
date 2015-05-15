@@ -1,42 +1,42 @@
 package main
 
 import (
+	"bytes"
 	"flag"
+	"io"
 	"log"
 	"net"
 	"time"
 )
 
 func sendData(addr string, ok chan bool) {
-	payload := make([]byte, 4096)
-	//payload = []byte("asjxlkajclkasjclka")
+	log.Println("sending data")
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("sendData: %v", err)
 	}
-	time.Sleep(time.Duration(10000))
-	log.Println("sending data")
-	for i := 0; i < 20; i++ {
-		_, err = conn.Write(payload)
-	}
-	conn.Close()
+	time.Sleep(time.Duration(100000))
+	payload := make([]byte, 40960)
+	payload = []byte("AAAAAAAAAAAAARGH")
+	_, err = conn.Write(payload)
 	ok <- true
 }
 
 func receiveData(conn net.Listener) {
 	log.Println("receiver starterd")
-	payload := make([]byte, 4096)
-	listenerConnection, err := conn.Accept()
-	if err != nil {
-		log.Fatal(err)
-	}
-	for i := 0; i < 20; i++ {
-		_, err := listenerConnection.Read(payload)
+	for {
+		listenerConnection, err := conn.Accept()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("receiveData: %v", err)
 		}
+		var buf bytes.Buffer
+		_, err = io.Copy(&buf, listenerConnection)
+		//_, err := listenerConnection.Read(payload)
+		if err != nil {
+			log.Fatalf("receiveData: %v", err)
+		}
+		log.Printf("data received: %v", buf.String())
 	}
-	conn.Close()
 
 }
 
@@ -62,21 +62,24 @@ func main() {
 	flag.Parse()
 	if server {
 		defer close(statsResults)
+		if _, err := net.InterfaceByName(iface); err != nil {
+			log.Fatalf("Could Not find interface %v: %v", iface, err)
+		}
 		listener, err := net.Listen("tcp", address+":"+port)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("main; %v", err)
 		}
 		log.Println("server started")
 		ok := make(chan bool)
 		go StreamStats(iface, int32(snaplen))
 		go printStats(statsResults)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("main; %v", err)
 		}
 		go receiveData(listener)
 		x := <-ok
 		if !x {
-			log.Fatal(err)
+			log.Fatalf("main; %v", err)
 		}
 	} else {
 		ok := make(chan bool)
