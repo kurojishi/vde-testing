@@ -59,6 +59,10 @@ func (s *StatsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
 // ReassemblyComplete is called when the TCP assembler believes a stream has
 // finished.
 func (s *StatsStream) ReassemblyComplete() {
+	diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
+	log.Printf("Reassembly of stream %v:%v complete - start:%v end:%v bytes:%v packets:%v ooo:%v bps:%v pps:%v skipped:%v",
+		s.net, s.transport, s.start, s.end, s.bytes, s.packets, s.outOfOrder,
+		float64(s.bytes)/diffSecs, float64(s.packets)/diffSecs, s.skipped)
 	statsResults <- *s
 }
 
@@ -92,12 +96,12 @@ func StreamStats(iface string, snaplen int32) {
 	var payload gopacket.Payload
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &dot1q, &ip4, &ip6, &ip6ext, &tcp, &udp, &payload)
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
-	decoded := make([]gopacket.LayerType, 0, 4)
+	decoded := make([]gopacket.LayerType, 0, 8)
 
 	var byteCount int64
 
 	for packet := range source.Packets() {
-		log.Printf(packet.String())
+		//log.Printf("StreamStats: %v", packet.String())
 		//if err != nil {
 		//log.Printf("error getting packet: %v", err)
 		////TODO:comunicate with client and restart
@@ -121,7 +125,6 @@ func StreamStats(iface string, snaplen int32) {
 				netFlow = ip6.NetworkFlow()
 				foundNetLayer = true
 			case layers.LayerTypeTCP:
-				log.Println("Found TCP layer")
 				if foundNetLayer {
 					assembler.Assemble(netFlow, &tcp)
 				}

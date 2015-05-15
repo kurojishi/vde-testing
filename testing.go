@@ -58,7 +58,7 @@ func main() {
 	flag.StringVar(&port, "p", "5000", "starting port")
 	flag.BoolVar(&server, "server", false, "service will be a server")
 	flag.StringVar(&iface, "i", "tap0", "interface connected to the switch")
-	flag.IntVar(&snaplen, "s", 0, "spanlen for pcap capture")
+	flag.IntVar(&snaplen, "s", 1600, "spanlen for pcap capture")
 	flag.Parse()
 	if server {
 		defer close(statsResults)
