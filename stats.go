@@ -63,13 +63,12 @@ func (s *StatsStream) ReassemblyComplete() {
 	log.Printf("Reassembly of stream %v:%v complete - start:%v end:%v bytes:%v packets:%v ooo:%v bps:%v pps:%v skipped:%v",
 		s.net, s.transport, s.start, s.end, s.bytes, s.packets, s.outOfOrder,
 		float64(s.bytes)/diffSecs, float64(s.packets)/diffSecs, s.skipped)
-	statsResults <- *s
 }
 
 //StreamStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
 func StreamStats(iface string, snaplen int32) {
-	flushDuration, err := time.ParseDuration("30s")
+	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
 	}
@@ -100,19 +99,22 @@ func StreamStats(iface string, snaplen int32) {
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
 	}
-	defer handle.Close()
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	source.NoCopy = true
 	nextFlush := time.Now().Add(flushDuration / 2)
 
 	log.Println("Catching stream stats")
 loop:
-	for packet := range source.Packets() {
+	for {
 		if time.Now().After(nextFlush) {
 			stats, _ := handle.Stats()
 			log.Printf("Flushing all streams that havent' seen packets in the last 2 minutes, pcap stats: %+v", stats)
 			assembler.FlushOlderThan(time.Now().Add(flushDuration))
 			nextFlush = time.Now().Add(flushDuration / 2)
+		}
+		packet, err := source.NextPacket()
+		if err != nil {
+			continue
 		}
 		if err := parser.DecodeLayers(packet.Data(), &decoded); err != nil {
 			log.Printf("error decoding packet: %v", err)
