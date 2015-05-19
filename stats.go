@@ -104,7 +104,6 @@ func StreamStats(iface string, snaplen int32) {
 	nextFlush := time.Now().Add(flushDuration / 2)
 
 	log.Println("Catching stream stats")
-loop:
 	for {
 		if time.Now().After(nextFlush) {
 			stats, _ := handle.Stats()
@@ -122,23 +121,7 @@ loop:
 		}
 
 		byteCount += int64(len(packet.Data()))
-		var netFlow gopacket.Flow
-		foundNetLayer := false
-		for _, typ := range decoded {
-			switch typ {
-			case layers.LayerTypeIPv4:
-				netFlow = ip4.NetworkFlow()
-				foundNetLayer = true
-			case layers.LayerTypeIPv6:
-				netFlow = ip6.NetworkFlow()
-				foundNetLayer = true
-			case layers.LayerTypeTCP:
-				if foundNetLayer {
-					assembler.Assemble(netFlow, &tcp)
-				}
-				continue loop
-			}
-		}
+		assembler.Assemble(packet.NetworkLayer().NetworkFlow(), &tcp)
 	}
 	log.Print("why am i here?")
 }
