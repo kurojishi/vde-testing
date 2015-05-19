@@ -92,9 +92,9 @@ func StreamStats(iface string, snaplen int32) {
 	var ip6 layers.IPv6
 	var ip6ext layers.IPv6ExtensionSkipper
 	var tcp layers.TCP
-	var udp layers.UDP
+	//var udp layers.UDP
 	var payload gopacket.Payload
-	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &dot1q, &ip4, &ip6, &ip6ext, &tcp, &udp, &payload)
+	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &dot1q, &ip4, &ip6, &ip6ext, &tcp, &payload)
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	decoded := make([]gopacket.LayerType, 0, 8)
 
