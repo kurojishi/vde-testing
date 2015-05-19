@@ -123,11 +123,7 @@ func StreamStats(iface string, snaplen int32) {
 		}
 
 		byteCount += int64(len(packet.Data()))
-		if packet.TransportLayer().LayerType() == layers.LayerTypeTCP {
-			assembler.Assemble(packet.NetworkLayer().NetworkFlow(), &tcp)
-		} else {
-			//TODO:what do do if layer is not TCP?
-		}
+		assembler.Assemble(packet.NetworkLayer().NetworkFlow(), &tcp)
 	}
 	log.Print("why am i here?")
 }
