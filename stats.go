@@ -69,12 +69,11 @@ func (s *StatsStream) ReassemblyComplete() {
 //StreamStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
 func StreamStats(iface string, snaplen int32) {
-	log.Printf("starting caputre on %v", iface)
-	handle, err := pcap.OpenLive(iface, snaplen, true, 0)
+	flushDuration, err := time.ParseDuration("30s")
 	if err != nil {
-		log.Fatal("error opening pcap handle: ", err)
+		log.Fatal("invalid flush duration", err)
 	}
-	defer handle.Close()
+	log.Printf("starting caputre on %v", iface)
 
 	//set up assembler
 
@@ -83,8 +82,6 @@ func StreamStats(iface string, snaplen int32) {
 	assembler := tcpassembly.NewAssembler(streamPool)
 	assembler.MaxBufferedPagesTotal = 0
 	assembler.MaxBufferedPagesPerConnection = 0
-
-	log.Println("Catching stream stats")
 
 	var eth layers.Ethernet
 	var dot1q layers.Dot1Q
@@ -95,27 +92,36 @@ func StreamStats(iface string, snaplen int32) {
 	//var udp layers.UDP
 	var payload gopacket.Payload
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &dot1q, &ip4, &ip6, &ip6ext, &tcp, &payload)
-	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	decoded := make([]gopacket.LayerType, 0, 8)
 
 	var byteCount int64
 
+	handle, err := pcap.OpenLive(iface, int32(snaplen), true, flushDuration/2)
+	if err != nil {
+		log.Fatal("error opening pcap handle: ", err)
+	}
+	defer handle.Close()
+	source := gopacket.NewPacketSource(handle, handle.LinkType())
+	source.NoCopy = true
+	nextFlush := time.Now().Add(flushDuration / 2)
+
+	log.Println("Catching stream stats")
+loop:
 	for packet := range source.Packets() {
-		//log.Printf("StreamStats: %v", packet.String())
-		//if err != nil {
-		//log.Printf("error getting packet: %v", err)
-		////TODO:comunicate with client and restart
-		//continue
-		//}
-		err := parser.DecodeLayers(packet.Data(), &decoded)
-		if err != nil {
+		if time.Now().After(nextFlush) {
+			stats, _ := handle.Stats()
+			log.Printf("Flushing all streams that havent' seen packets in the last 2 minutes, pcap stats: %+v", stats)
+			assembler.FlushOlderThan(time.Now().Add(flushDuration))
+			nextFlush = time.Now().Add(flushDuration / 2)
+		}
+		if err := parser.DecodeLayers(packet.Data(), &decoded); err != nil {
 			log.Printf("error decoding packet: %v", err)
 			continue
 		}
 
 		byteCount += int64(len(packet.Data()))
-		foundNetLayer := false
 		var netFlow gopacket.Flow
+		foundNetLayer := false
 		for _, typ := range decoded {
 			switch typ {
 			case layers.LayerTypeIPv4:
@@ -128,8 +134,9 @@ func StreamStats(iface string, snaplen int32) {
 				if foundNetLayer {
 					assembler.Assemble(netFlow, &tcp)
 				}
+				continue loop
 			}
 		}
 	}
-	assembler.FlushAll()
+	log.Print("why am i here?")
 }
