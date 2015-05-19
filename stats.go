@@ -81,6 +81,7 @@ func StreamStats(iface string, snaplen int32) {
 	assembler := tcpassembly.NewAssembler(streamPool)
 	assembler.MaxBufferedPagesTotal = 0
 	assembler.MaxBufferedPagesPerConnection = 0
+	defer assembler.FlushAll()
 
 	var eth layers.Ethernet
 	var dot1q layers.Dot1Q
@@ -99,6 +100,7 @@ func StreamStats(iface string, snaplen int32) {
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
 	}
+	defer handle.Close()
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	source.NoCopy = true
 	nextFlush := time.Now().Add(flushDuration / 2)
