@@ -59,10 +59,11 @@ func (s *StatsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
 // ReassemblyComplete is called when the TCP assembler believes a stream has
 // finished.
 func (s *StatsStream) ReassemblyComplete() {
+	//TODO: write this data to a file
 	diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
-	log.Printf("Reassembly of stream %v:%v complete - start:%v end:%v bytes:%v packets:%v ooo:%v bps:%v pps:%v skipped:%v",
+	log.Printf("Reassembly of stream %v:%v complete - start:%v end:%v bytes:%v packets:%v ooo:%v BITRATE:%vMB pps:%v skipped:%v",
 		s.net, s.transport, s.start, s.end, s.bytes, s.packets, s.outOfOrder,
-		float64(s.bytes)/diffSecs, float64(s.packets)/diffSecs, s.skipped)
+		(float64(s.bytes)/diffSecs)/float64(1000), float64(s.packets)/diffSecs, s.skipped)
 }
 
 //StreamStats returns all the statistics from a series of streams on a specific interface
@@ -108,8 +109,7 @@ func StreamStats(iface string, snaplen int32) {
 	log.Println("Catching stream stats")
 	for {
 		if time.Now().After(nextFlush) {
-			stats, _ := handle.Stats()
-			log.Printf("Flushing all streams that havent' seen packets in the last 2 minutes, pcap stats: %+v", stats)
+			//log.Println("Flushing all streams that havent' seen packets")
 			assembler.FlushOlderThan(time.Now().Add(flushDuration))
 			nextFlush = time.Now().Add(flushDuration / 2)
 		}
