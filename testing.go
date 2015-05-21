@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
 )
 
 type nullFile struct{}
@@ -71,13 +72,13 @@ func main() {
 		if _, err := net.InterfaceByName(iface); err != nil {
 			log.Fatalf("Could Not find interface %v: %v", iface, err)
 		}
-		listener, err := net.Listen("tcp", address+":"+string(port))
+		listener, err := net.Listen("tcp", address+":"+strconv.Itoa(port))
 		if err != nil {
 			log.Fatalf("main; %v", err)
 		}
 		log.Println("server started")
 		ok := make(chan bool)
-		go StreamStats(iface, int32(snaplen), address, port)
+		go StreamStats(iface, int32(snaplen), port)
 		if err != nil {
 			log.Fatalf("main; %v", err)
 		}
@@ -88,7 +89,7 @@ func main() {
 		}
 	} else {
 		ok := make(chan bool)
-		go sendData(address+":"+string(port), size, ok)
+		go sendData(address+":"+strconv.Itoa(port), size, ok)
 		x := <-ok
 		if !x {
 			log.Println("WTF")

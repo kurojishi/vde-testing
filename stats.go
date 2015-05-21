@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/google/gopacket"
@@ -69,7 +70,7 @@ func (s *StatsStream) ReassemblyComplete() {
 
 //StreamStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
-func StreamStats(iface string, snaplen int32, address string, port int) {
+func StreamStats(iface string, snaplen int32, port int) {
 	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
@@ -124,7 +125,9 @@ func StreamStats(iface string, snaplen int32, address string, port int) {
 		}
 
 		byteCount += int64(len(packet.Data()))
-		assembler.Assemble(packet.NetworkLayer().NetworkFlow(), &tcp)
+		if packet.TransportLayer().TransportFlow().Dst().String() == strconv.Itoa(port) {
+			assembler.Assemble(packet.NetworkLayer().NetworkFlow(), &tcp)
+		}
 	}
 	log.Print("why am i here?")
 }
