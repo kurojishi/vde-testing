@@ -72,7 +72,7 @@ func StreamStats(iface string, snaplen int64, port string, cch chan int) {
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
 	}
-	log.Printf("starting caputre on %v", iface)
+	log.Printf("starting capture on %v", iface)
 
 	//set up assembler
 

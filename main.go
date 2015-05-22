@@ -23,20 +23,10 @@ func main() {
 		if _, err := net.InterfaceByName(iface); err != nil {
 			log.Fatalf("Could Not find interface %v: %v", iface, err)
 		}
-		ok := make(chan bool)
 		ready := make(chan int)
-		go receiveData("tcp", address+":"+strconv.Itoa(port), ready)
 		go StreamStats(iface, snaplen, strconv.Itoa(port), ready)
-		x := <-ok
-		if !x {
-			log.Fatalf("WTF")
-		}
+		receiveData("tcp", address+":"+strconv.Itoa(port), ready)
 	} else {
-		ok := make(chan bool)
-		go sendData(address+":"+strconv.Itoa(port), size, ok)
-		x := <-ok
-		if !x {
-			log.Println("WTF")
-		}
+		sendData(address+":"+strconv.Itoa(port), size)
 	}
 }

@@ -21,7 +21,7 @@ var devZero = &zeroFile{}
 var devNull = &nullFile{}
 
 //sendData send size data (in megabytes)to the string addr
-func sendData(addr string, size int64, ok chan bool) {
+func sendData(addr string, size int64) {
 	log.Println("sending data")
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -35,7 +35,6 @@ func sendData(addr string, size int64, ok chan bool) {
 		log.Fatalf("couldnt send %v Megabytes", float64(n)/float64(1000000))
 	}
 	log.Printf("sent %v MB", size)
-	ok <- true
 }
 
 func receiveData(protocol string, address string, cch chan int) {
