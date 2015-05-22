@@ -10,34 +10,26 @@ import (
 func main() {
 	var server bool
 	var address, iface string
-	var port, snaplen int
-	var size int64
+	var port int
+	var size, snaplen int64
 	flag.StringVar(&address, "address", "192.168.4.1", "address to send the data too")
 	flag.IntVar(&port, "p", 5000, "starting port")
 	flag.BoolVar(&server, "server", false, "service will be a server")
 	flag.StringVar(&iface, "i", "tap0", "interface connected to the switch")
-	flag.IntVar(&snaplen, "s", 1600, "spanlen for pcap capture")
+	flag.Int64Var(&snaplen, "s", 1600, "spanlen for pcap capture")
 	flag.Int64Var(&size, "size", 150, "ho much data to send")
 	flag.Parse()
 	if server {
-		defer close(statsResults)
 		if _, err := net.InterfaceByName(iface); err != nil {
 			log.Fatalf("Could Not find interface %v: %v", iface, err)
 		}
-		listener, err := net.Listen("tcp", address+":"+strconv.Itoa(port))
-		if err != nil {
-			log.Fatalf("main; %v", err)
-		}
-		log.Println("server started")
 		ok := make(chan bool)
-		go StreamStats(iface, int32(snaplen), port)
-		if err != nil {
-			log.Fatalf("main; %v", err)
-		}
-		go receiveData(listener)
+		ready := make(chan int)
+		go receiveData("tcp", address+":"+strconv.Itoa(port), ready)
+		go StreamStats(iface, snaplen, strconv.Itoa(port), ready)
 		x := <-ok
 		if !x {
-			log.Fatalf("main; %v", err)
+			log.Fatalf("WTF")
 		}
 	} else {
 		ok := make(chan bool)

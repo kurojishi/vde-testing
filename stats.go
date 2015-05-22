@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"strconv"
 	"time"
 
 	"github.com/google/gopacket"
@@ -10,8 +9,6 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/tcpassembly"
 )
-
-var statsResults chan StatsStream
 
 // simpleStreamFactory implements tcpassembly.StreamFactory
 type statsStreamFactory struct{}
@@ -70,7 +67,7 @@ func (s *StatsStream) ReassemblyComplete() {
 
 //StreamStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
-func StreamStats(iface string, snaplen int32, port int) {
+func StreamStats(iface string, snaplen int64, port string, cch chan int) {
 	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
@@ -99,6 +96,10 @@ func StreamStats(iface string, snaplen int32, port int) {
 
 	var byteCount int64
 
+	if ready := <-cch; ready != 1 {
+		log.Fatal("bad syncronization message")
+	}
+
 	handle, err := pcap.OpenLive(iface, int32(snaplen), true, flushDuration/2)
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
@@ -125,7 +126,7 @@ func StreamStats(iface string, snaplen int32, port int) {
 		}
 
 		byteCount += int64(len(packet.Data()))
-		if packet.TransportLayer().TransportFlow().Dst().String() == strconv.Itoa(port) {
+		if packet.TransportLayer().TransportFlow().Dst().String() == port {
 			assembler.Assemble(packet.NetworkLayer().NetworkFlow(), &tcp)
 		}
 	}
