@@ -38,14 +38,16 @@ func sendData(addr string, size int64, ok chan bool) {
 	ok <- true
 }
 
-func receiveData(protocol string, address string, ready chan int) {
+func receiveData(protocol string, address string, cch chan int) {
+	if ready := <-cch; ready != 1 {
+		log.Fatal("Wrong control message")
+	}
 	listener, err := net.Listen(protocol, address)
 	if err != nil {
-		log.Fatalf("main; %v", err)
+		log.Fatalf("ReceiveData %v", err)
 	}
 	log.Println("server started")
 	log.Println("receiver starterd")
-	ready <- 1
 	for {
 		conn, err := listener.Accept()
 		if err != nil {

@@ -96,10 +96,6 @@ func StreamStats(iface string, snaplen int64, port string, cch chan int) {
 
 	var byteCount int64
 
-	if ready := <-cch; ready != 1 {
-		log.Fatal("bad syncronization message")
-	}
-
 	handle, err := pcap.OpenLive(iface, int32(snaplen), true, flushDuration/2)
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
@@ -110,6 +106,7 @@ func StreamStats(iface string, snaplen int64, port string, cch chan int) {
 	nextFlush := time.Now().Add(flushDuration / 2)
 
 	log.Println("Catching stream stats")
+	cch <- 1
 	for {
 		if time.Now().After(nextFlush) {
 			//log.Println("Flushing all streams that havent' seen packets")
