@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"net"
@@ -20,6 +21,30 @@ func (d *zeroFile) Read(p []byte) (int, error) {
 var devZero = &zeroFile{}
 var devNull = &nullFile{}
 
+//controlServer start the controls channel from the client to the server and vice versa
+func controlServer(kind string, address string, cch chan int) {
+	clistener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("Control Server Started")
+	for {
+		conn, err := clistener.Accept()
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		var buf bytes.Buffer
+		buf.ReadFrom(conn)
+		//TODO: define the other cases
+		switch buf.String() {
+		case "ready":
+			cch <- 1
+
+		}
+	}
+}
+
 //sendData send size data (in megabytes)to the string addr
 func sendData(addr string, size int64) {
 	log.Println("sending data")
@@ -27,7 +52,7 @@ func sendData(addr string, size int64) {
 	if err != nil {
 		log.Fatalf("sendData: %v", err)
 	}
-	n, err := io.CopyN(conn, devZero, size*(1000000))
+	n, err := io.CopyN(devNull, conn, size*(1000000))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,7 +77,7 @@ func receiveData(protocol string, address string, cch chan int) {
 		if err != nil {
 			log.Fatalf("receiveData: %v", err)
 		}
-		_, err = io.Copy(devNull, conn)
+		_, err = io.Copy(conn, devZero)
 		if err != nil {
 			log.Fatalf("receiveData: %v", err)
 		}
