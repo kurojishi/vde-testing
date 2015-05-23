@@ -1,4 +1,3 @@
-// Package main provides ...
 package main
 
 import (
@@ -7,8 +6,8 @@ import (
 	"net"
 )
 
-//controlServer start the controls channel from the client to the server and vice versa
-func controlServer(kind string, address string, cch chan int) {
+//controlServer start the controls channel on the client
+func controlServer(address string, cch chan int) {
 	clistener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatal(err)
@@ -23,23 +22,29 @@ func controlServer(kind string, address string, cch chan int) {
 		var buf bytes.Buffer
 		buf.ReadFrom(conn)
 		//TODO: define the other cases
-		if kind == "client" {
-			switch buf.String() {
-			case "ready":
-				cch <- 1
-			case "bandwidth":
-				cch <- 2
-			case "latency":
-				cch <- 3
-			case "load":
-				cch <- 4
-			case "stress":
-				cch <- 5
-			}
-		} else if kind == "server" {
-
-		} else {
-			log.Fatal("Wrong kind of controlServer")
+		switch buf.String() {
+		case "ready":
+			cch <- 1
+		case "bandwidth":
+			cch <- 2
+		case "latency":
+			cch <- 3
+		case "load":
+			cch <- 4
+		case "stress":
+			cch <- 5
 		}
 	}
+}
+
+func sendControlSignal(address string, msg string) error {
+	conn, err := net.Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+	_, err = conn.Write([]byte(msg))
+	if err != nil {
+		return err
+	}
+	return nil
 }
