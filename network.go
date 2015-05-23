@@ -37,10 +37,23 @@ func controlServer(kind string, address string, cch chan int) {
 		var buf bytes.Buffer
 		buf.ReadFrom(conn)
 		//TODO: define the other cases
-		switch buf.String() {
-		case "ready":
-			cch <- 1
+		if kind == "client" {
+			switch buf.String() {
+			case "ready":
+				cch <- 1
+			case "bandwidth":
+				cch <- 2
+			case "latency":
+				cch <- 3
+			case "load":
+				cch <- 4
+			case "stress":
+				cch <- 5
+			}
+		} else if kind == "server" {
 
+		} else {
+			log.Fatal("Wrong kind of controlServer")
 		}
 	}
 }
