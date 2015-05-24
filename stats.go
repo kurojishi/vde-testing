@@ -67,7 +67,7 @@ func (s *StatsStream) ReassemblyComplete() {
 
 //StreamStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
-func StreamStats(iface string, snaplen int64, port string, cch chan int) {
+func StreamStats(iface string, snaplen int64, port string, sync chan int32) {
 	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
@@ -106,7 +106,7 @@ func StreamStats(iface string, snaplen int64, port string, cch chan int) {
 	nextFlush := time.Now().Add(flushDuration / 2)
 
 	log.Println("Catching stream stats")
-	cch <- 1
+	sync <- ready
 	for {
 		if time.Now().After(nextFlush) {
 			//log.Println("Flushing all streams that havent' seen packets")
@@ -124,7 +124,7 @@ func StreamStats(iface string, snaplen int64, port string, cch chan int) {
 
 		byteCount += int64(len(packet.Data()))
 		if packet.TransportLayer().TransportFlow().Dst().String() == port {
-			assembler.Assemble(packet.NetworkLayer().NetworkFlow(), &tcp)
+			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
 	log.Print("why am i here?")
