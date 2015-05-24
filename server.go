@@ -67,7 +67,7 @@ func receiveData(protocol string, address string, cch, synch chan int32) {
 		if err != nil {
 			log.Fatalf("connection error: %v", err)
 		}
-		_, err = io.Copy(conn, devZero)
+		_, err = io.Copy(devNull, conn)
 		if err != nil {
 			log.Fatalf("data receive error: %v", err)
 		}

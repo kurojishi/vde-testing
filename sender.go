@@ -47,7 +47,7 @@ func sendData(addr string, size int64) {
 	if err != nil {
 		log.Fatalf("sendData: %v", err)
 	}
-	n, err := io.CopyN(devNull, conn, size*(1000000))
+	n, err := io.CopyN(conn, devZero, size*(1000000))
 	if err != nil {
 		log.Fatal(err)
 	}
