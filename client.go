@@ -49,6 +49,7 @@ func controlServer(bind, address string) {
 //sendData send size data (in megabytes)to the string addr
 func sendData(addr string, size int64) {
 	log.Println("sending data")
+	_, err := net.ResolveTCPAddr("tcp", addr)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Fatalf("sendData: %v", err)

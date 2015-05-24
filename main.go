@@ -19,6 +19,12 @@ func main() {
 	flag.Int64Var(&snaplen, "snaplen", 1600, "spanlen for pcap capture")
 	flag.StringVar(&control, "b", "192.168.4.15:8000", "")
 	flag.Parse()
+	if _, err := net.ResolveIPAddr("ip", address); err != nil {
+		log.Fatal(err)
+	}
+	if _, err := net.ResolveIPAddr("ip", control); err != nil {
+		log.Fatal(err)
+	}
 	fullAddr := address + ":" + strconv.Itoa(port)
 	if server {
 		sPort := strconv.Itoa(port)
@@ -28,6 +34,7 @@ func main() {
 		cch := make(chan int32)
 		go signalLoop(control, cch)
 		bandwidthTest(iface, sPort, fullAddr, snaplen, cch)
+		//latencyTest(address)
 	} else {
 		controlServer(control, fullAddr)
 	}
