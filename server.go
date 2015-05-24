@@ -12,11 +12,12 @@ const (
 	latency   int32 = 2
 	load      int32 = 3
 	stress    int32 = 4
+	die       int32 = 0
 )
 
 const (
-	stop  int32 = 0
-	ready int32 = 1
+	stop  int32 = 1
+	ready int32 = 2
 )
 
 type zeroFile struct{}
@@ -64,17 +65,15 @@ func receiveData(protocol string, address string, cch, synch chan int32) {
 	}
 	cch <- bandwidth
 	log.Println("server started, control message sent")
-	for {
-		conn, err := listener.Accept()
-		log.Print("accepted connection")
-		if err != nil {
-			log.Fatalf("connection error: %v", err)
-		}
-		_, err = io.Copy(devNull, conn)
-		if err != nil {
-			log.Fatalf("data receive error: %v", err)
-		}
-		<-synch
+	conn, err := listener.Accept()
+	log.Print("accepted connection")
+	if err != nil {
+		log.Fatalf("connection error: %v", err)
 	}
+	_, err = io.Copy(devNull, conn)
+	if err != nil {
+		log.Fatalf("data receive error: %v", err)
+	}
+	<-synch
 
 }

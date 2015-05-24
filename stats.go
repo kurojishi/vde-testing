@@ -21,9 +21,12 @@ type StatsStream struct {
 	sawStart, sawEnd                    bool
 }
 
+var finished bool
+
 // New creates a new stream.  It's called whenever the assembler sees a stream
 // it isn't currently following.
 func (factory *statsStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
+	//TODO:remove this print
 	log.Printf("new stream %v:%v started", net, transport)
 	s := &StatsStream{
 		net:       net,
@@ -58,14 +61,19 @@ func (s *StatsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
 // finished.
 func (s *StatsStream) ReassemblyComplete() {
 	//TODO: write this data to a file
-	diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
-	log.Printf("stream took %v seconds to complete, sent %v MB with a bitrate of %v MB", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
-
+	if !finished {
+		diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
+		log.Printf("stream took %v seconds to complete, sent %v MB with a bitrate of %v MB", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
+		finished = true
+	} else {
+		log.Println("don't know don't care")
+	}
 }
 
 //TCPStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
 func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
+	finished = false
 	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
@@ -105,7 +113,7 @@ func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
 
 	log.Println("Catching stream stats")
 	sync <- ready
-	for {
+	for !finished {
 		if time.Now().After(nextFlush) {
 			//log.Println("Flushing all streams that havent' seen packets")
 			assembler.FlushOlderThan(time.Now().Add(flushDuration))
@@ -126,5 +134,5 @@ func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
 		}
 	}
 	sync <- stop
-	log.Print("why am i here?")
+	log.Print("Catching finished")
 }
