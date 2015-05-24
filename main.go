@@ -34,7 +34,7 @@ func main() {
 		cch := make(chan int32)
 		go signalLoop(control, cch)
 		bandwidthTest(iface, sPort, fullAddr, snaplen, cch)
-		//latencyTest(address)
+		latencyTest(address)
 	} else {
 		controlServer(control, fullAddr)
 	}
