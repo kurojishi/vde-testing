@@ -25,11 +25,9 @@ func main() {
 		if _, err := net.InterfaceByName(iface); err != nil {
 			log.Fatalf("Could Not find interface %v: %v", iface, err)
 		}
-		sync := make(chan int32)
 		cch := make(chan int32)
 		go signalLoop(control, cch)
-		go TCPStats(iface, snaplen, sPort, sync)
-		receiveData("tcp", fullAddr, cch, sync)
+		bandwidthTest(iface, sPort, fullAddr, snaplen, cch)
 	} else {
 		controlServer(control, fullAddr)
 	}

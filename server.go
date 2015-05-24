@@ -44,7 +44,6 @@ func sendControlSignal(address string, msg int32) error {
 	if err != nil {
 		return err
 	}
-	log.Print("send control message")
 	return nil
 }
 
@@ -57,16 +56,16 @@ func signalLoop(control string, cch chan int32) {
 	}
 }
 
-func receiveData(protocol string, address string, cch, synch chan int32) {
-	<-synch
-	listener, err := net.Listen(protocol, address)
+func bandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
+	sync := make(chan int32)
+	go TCPStats(iface, snaplen, port, sync)
+	<-sync
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("ReceiveData %v", err)
 	}
 	cch <- bandwidth
-	log.Println("server started, control message sent")
 	conn, err := listener.Accept()
-	log.Print("accepted connection")
 	if err != nil {
 		log.Fatalf("connection error: %v", err)
 	}
@@ -74,6 +73,6 @@ func receiveData(protocol string, address string, cch, synch chan int32) {
 	if err != nil {
 		log.Fatalf("data receive error: %v", err)
 	}
-	<-synch
+	<-sync
 
 }
