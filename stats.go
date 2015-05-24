@@ -27,7 +27,6 @@ var finished bool
 // it isn't currently following.
 func (factory *statsStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
 	//TODO:remove this print
-	log.Printf("new stream %v:%v started", net, transport)
 	s := &StatsStream{
 		net:       net,
 		transport: transport,
