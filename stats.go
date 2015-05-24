@@ -68,7 +68,7 @@ func (s *StatsStream) ReassemblyComplete() {
 //StreamStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
 func StreamStats(iface string, snaplen int64, port string, sync chan int32) {
-	flushDuration, err := time.ParseDuration("1m")
+	flushDuration, err := time.ParseDuration("2m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
 	}

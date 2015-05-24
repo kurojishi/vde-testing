@@ -31,8 +31,6 @@ func main() {
 		go StreamStats(iface, snaplen, sPort, sync)
 		receiveData("tcp", fullAddr, cch, sync)
 	} else {
-		cch := make(chan int32)
-		controlServer(control, cch)
-		go startTests(cch, fullAddr)
+		controlServer(control, fullAddr)
 	}
 }

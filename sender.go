@@ -8,17 +8,9 @@ import (
 	"net"
 )
 
-type nullFile struct{}
-
-func (d *nullFile) Write(p []byte) (int, error) {
-	return len(p), nil
-}
-
-var devNull = &nullFile{}
-
 //controlServer start the controls channel on the client
-func controlServer(address string, cch chan int32) {
-	clistener, err := net.Listen("tcp", address)
+func controlServer(bind, address string) {
+	clistener, err := net.Listen("tcp", bind)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,31 +27,17 @@ func controlServer(address string, cch chan int32) {
 		//TODO: define the other cases
 		switch buf {
 		case bandwidth:
-			cch <- 1
-		case latency:
-			cch <- 2
-		case load:
-			cch <- 3
-		case stress:
-			cch <- 4
+			sendData(address, 150)
+			//case latency:
+			//case load:
+			//case stress:
+		case die:
+			break
+
 		default:
 			continue
 		}
 	}
-}
-
-func startTests(cch chan int32, addr string) {
-	for msg := range cch {
-		switch msg {
-		case bandwidth:
-			log.Println("starting bandwidth test")
-			sendData(addr, 150)
-		default:
-			continue
-
-		}
-	}
-
 }
 
 //sendData send size data (in megabytes)to the string addr
