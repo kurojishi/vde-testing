@@ -8,6 +8,12 @@ import (
 	"net"
 )
 
+const (
+	kb int64 = 1000
+	mb int64 = 1000 * kb
+	gb int64 = 1000 * mb
+)
+
 //controlServer start the controls channel on the client
 func controlServer(bind, address string) {
 	clistener, err := net.Listen("tcp", bind)
@@ -27,11 +33,11 @@ func controlServer(bind, address string) {
 		//TODO: define the other cases
 		switch buf {
 		case bandwidth:
-			sendData(address, 150)
+			sendData(address, 1000)
 			//case latency:
 			//case load:
 			//case stress:
-		case stop:
+		case die:
 			break
 
 		default:
@@ -47,12 +53,12 @@ func sendData(addr string, size int64) {
 	if err != nil {
 		log.Fatalf("sendData: %v", err)
 	}
-	n, err := io.CopyN(conn, devZero, size*(1000000))
+	n, err := io.CopyN(conn, devZero, size*(mb))
 	if err != nil {
 		log.Fatal(err)
 	}
-	if n != size*1000000 {
-		log.Fatalf("couldnt send %v Megabytes", float64(n)/float64(1000000))
+	if n != size*mb {
+		log.Fatalf("couldnt send %v Megabytes", float64(n)/float64(mb))
 	}
 	log.Printf("sent %v MB", size)
 }
