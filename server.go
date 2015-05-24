@@ -8,12 +8,15 @@ import (
 )
 
 const (
-	ready     int32 = 0
 	bandwidth int32 = 1
 	latency   int32 = 2
 	load      int32 = 3
 	stress    int32 = 4
-	die       int32 = 5
+)
+
+const (
+	stop  int32 = 0
+	ready int32 = 1
 )
 
 type zeroFile struct{}
@@ -71,7 +74,7 @@ func receiveData(protocol string, address string, cch, synch chan int32) {
 		if err != nil {
 			log.Fatalf("data receive error: %v", err)
 		}
-		cch <- die
+		<-synch
 	}
 
 }

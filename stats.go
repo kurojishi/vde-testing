@@ -60,14 +60,12 @@ func (s *StatsStream) ReassemblyComplete() {
 	//TODO: write this data to a file
 	diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
 	log.Printf("stream took %v seconds to complete, sent %v MB with a bitrate of %v MB", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
-	//log.Printf("Reassembly of stream %v:%v complete - start:%v end:%v bytes:%v packets:%v ooo:%v BITRATE:%vMB pps:%v skipped:%v",
-	//s.net, s.transport, s.start, s.end, s.bytes, s.packets, s.outOfOrder,
-	//(float64(s.bytes)/diffSecs)/float64(1000000), float64(s.packets)/diffSecs, s.skipped)
+
 }
 
-//StreamStats returns all the statistics from a series of streams on a specific interface
+//TCPStats returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
-func StreamStats(iface string, snaplen int64, port string, sync chan int32) {
+func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
 	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
@@ -127,5 +125,6 @@ func StreamStats(iface string, snaplen int64, port string, sync chan int32) {
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
+	sync <- stop
 	log.Print("why am i here?")
 }

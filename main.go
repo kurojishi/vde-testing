@@ -28,7 +28,7 @@ func main() {
 		sync := make(chan int32)
 		cch := make(chan int32)
 		go signalLoop(control, cch)
-		go StreamStats(iface, snaplen, sPort, sync)
+		go TCPStats(iface, snaplen, sPort, sync)
 		receiveData("tcp", fullAddr, cch, sync)
 	} else {
 		controlServer(control, fullAddr)

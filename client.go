@@ -31,7 +31,7 @@ func controlServer(bind, address string) {
 			//case latency:
 			//case load:
 			//case stress:
-		case die:
+		case stop:
 			break
 
 		default:
