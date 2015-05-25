@@ -64,8 +64,6 @@ func (s *StatsStream) ReassemblyComplete() {
 		diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
 		log.Printf("stream took %v seconds to complete, sent %v MB with a bitrate of %v MB", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
 		finished = true
-	} else {
-		log.Println("don't know don't care")
 	}
 }
 
