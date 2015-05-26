@@ -10,23 +10,20 @@ import (
 
 //TODO: save data to file
 func latencyTest(address string) {
-	rttch := make(chan time.Duration)
-	for i := 0; i < 10; i++ {
-		ra, err := net.ResolveIPAddr("ip", address)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pinger := fastping.NewPinger()
-		pinger.AddIPAddr(ra)
-		pinger.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
-			rttch <- rtt
+	rttch := make(chan time.Duration, 10)
+	ra, err := net.ResolveIPAddr("ip", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	pinger := fastping.NewPinger()
+	pinger.AddIPAddr(ra)
+	pinger.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
+		rttch <- rtt
 
-		}
-		maxRtt, err := time.ParseDuration("1s")
-		if err != nil {
-			log.Fatal(err)
-		}
-		pinger.MaxRTT = maxRtt
+	}
+	//set message size to 64 byte
+	pinger.Size = 64
+	for i := 0; i < 10; i++ {
 		pinger.Run()
 	}
 	close(rttch)

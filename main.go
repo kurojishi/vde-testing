@@ -21,14 +21,14 @@ func main() {
 	flag.Parse()
 	fullAddr := address + ":" + strconv.Itoa(port)
 	if server {
-		//sPort := strconv.Itoa(port)
+		sPort := strconv.Itoa(port)
 		if _, err := net.InterfaceByName(iface); err != nil {
 			log.Fatalf("Could Not find interface %v: %v", iface, err)
 		}
 		cch := make(chan int32)
 		go signalLoop(remote+":8000", cch)
-		//bandwidthTest(iface, sPort, fullAddr, snaplen, cch)
-		//latencyTest(remote)
+		bandwidthTest(iface, sPort, fullAddr, snaplen, cch)
+		latencyTest(remote)
 		latencyTest(remote)
 	} else {
 		controlServer(remote+":8000", fullAddr)
