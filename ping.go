@@ -8,38 +8,36 @@ import (
 	"github.com/tatsushid/go-fastping"
 )
 
+//TODO: save data to file
 func latencyTest(address string) {
-	rttch := make(chan time.Duration, 10)
-	rttContainer := make([]time.Duration, 0, 10)
-	pinger := fastping.NewPinger()
-	ra, err := net.ResolveIPAddr("ipv4:icmp", address)
-	if err != nil {
-		log.Fatal(err)
-	}
-	pinger.AddIPAddr(ra)
-	pinger.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
-		rttch <- rtt
-	}
-	pinger.MaxRTT, _ = time.ParseDuration("3s")
-	pinger.RunLoop()
-
-	select {
-	case <-pinger.Done():
-		if err := pinger.Err(); err != nil {
+	rttch := make(chan time.Duration)
+	for i := 0; i < 10; i++ {
+		ra, err := net.ResolveIPAddr("ip", address)
+		if err != nil {
 			log.Fatal(err)
 		}
-	case rtt := <-rttch:
-		rttContainer = append(rttContainer, rtt)
-		if len(rttContainer) >= 10 {
-			pinger.Stop()
+		pinger := fastping.NewPinger()
+		pinger.AddIPAddr(ra)
+		pinger.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
+			rttch <- rtt
+
 		}
+		maxRtt, err := time.ParseDuration("1s")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pinger.MaxRTT = maxRtt
+		pinger.Run()
 	}
+	close(rttch)
 
 	var sum time.Duration
-	for value := range rttContainer {
-		log.Printf("Test pint %d, latency %d", value, rttContainer[value]/2)
-		sum += rttContainer[value] / 2
+	var i int
+	for rtt := range rttch {
+		sum += rtt
+		i++
+		log.Printf("Test ping:latency %v ms", (float32(rtt)/2)/float32(time.Millisecond))
 	}
-	log.Printf("Medium latency is %v", sum/time.Second)
+	log.Printf("Medium Latency is: %v", (float32(sum/2)/float32(i))/float32(time.Millisecond))
 
 }
