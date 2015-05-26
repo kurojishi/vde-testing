@@ -1,4 +1,3 @@
-// Package main provides ...
 package main
 
 import (
@@ -34,7 +33,6 @@ func controlServer(bind, address string) {
 		switch buf {
 		case bandwidth:
 			sendData(address, 1000)
-			//case latency:
 			//case load:
 			//case stress:
 		case die:
