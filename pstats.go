@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/kurojishi/procfs"
+	"github.com/jandre/procfs"
 )
 
 //PollVdeStats save stats gather information
