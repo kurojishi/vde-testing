@@ -4,13 +4,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/jandre/procfs"
+	"github.com/kurojishi/procfs"
 )
 
 //Stats save stats gather information
 //on on the pid process using the proc filesystem
 func Stats(pid int, ticker *time.Ticker) error {
-	for now := range ticker.C {
+	for range ticker.C {
 		process, err := procfs.NewProcess(pid, true)
 		if err != nil {
 			return err
@@ -28,7 +28,8 @@ func Stats(pid int, ticker *time.Ticker) error {
 			return err
 		}
 
-		log.Printf("Polling vde_switch data %v: cputime: %v memory: %v context_switches: %v threads: %v", now, pstats.Utime.UnixNano()+pstats.Stime.UnixNano()/int64(time.Second), pstatsm.Size, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
+		cputime := pstats.Utime.Sub(pstats.Starttime) + pstats.Stime.Sub(pstats.Starttime)
+		log.Printf("Polling vde_switch data %v: cputime: %v memory: %v context_switches: %v threads: %v", cputime/time.Second, pstatsm.Size, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
 	}
 
 	return nil
@@ -36,7 +37,7 @@ func Stats(pid int, ticker *time.Ticker) error {
 
 //PollStats call Stats every tick and close it when it's done
 func PollStats(pid int) *time.Ticker {
-	ticker := time.NewTicker(1 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	go Stats(pid, ticker)
 	return ticker
 }
