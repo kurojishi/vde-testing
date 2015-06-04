@@ -63,6 +63,7 @@ func bandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
 	sync := make(chan int32)
 	go TCPStats(iface, snaplen, port, sync)
 	<-sync
+	ticker := PollStats(pid)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("ReceiveData %v", err)
@@ -73,6 +74,7 @@ func bandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
 		log.Fatalf("connection error: %v", err)
 	}
 	_, err = io.Copy(devNull, conn)
+	ticker.Stop()
 	if err != nil {
 		log.Fatalf("data receive error: %v", err)
 	}

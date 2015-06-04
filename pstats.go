@@ -28,7 +28,7 @@ func Stats(pid int, ticker *time.Ticker) error {
 			return err
 		}
 
-		log.Printf("Polling vde_switch data %v: cputime: %v memory: %v context_switches: %v threads: %v", now, pstats.Utime.UnixNano()+pstats.Stime.UnixNano(), pstatsm.Size, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
+		log.Printf("Polling vde_switch data %v: cputime: %v memory: %v context_switches: %v threads: %v", now, pstats.Utime.UnixNano()+pstats.Stime.UnixNano()/int64(time.Second), pstatsm.Size, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
 	}
 
 	return nil

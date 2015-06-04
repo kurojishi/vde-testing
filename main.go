@@ -7,9 +7,11 @@ import (
 	"strconv"
 )
 
+var pid int
+
 func main() {
 	var server bool
-	var port, pid int
+	var port int
 	var snaplen int64
 	var address, remote, iface string
 	flag.StringVar(&address, "addr", "192.168.4.1", "address to send the data too")
@@ -18,7 +20,7 @@ func main() {
 	flag.StringVar(&iface, "i", "tap0", "interface connected to the switch")
 	flag.Int64Var(&snaplen, "snaplen", 1600, "spanlen for pcap capture")
 	flag.StringVar(&remote, "raddr", "192.168.4.15", "")
-	flag.IntVar(&pid, "p", 0, "the vde switch pid")
+	flag.IntVar(&pid, "pid", 0, "the vde switch pid")
 	flag.Parse()
 	fullAddr := address + ":" + strconv.Itoa(port)
 	if server {
@@ -28,9 +30,7 @@ func main() {
 		}
 		cch := make(chan int32)
 		go signalLoop(remote+":8000", cch)
-		ticker := PollStats(pid)
 		bandwidthTest(iface, sPort, fullAddr, snaplen, cch)
-		ticker.Stop()
 		latencyTest(remote)
 		latencyTest(remote)
 	} else {
