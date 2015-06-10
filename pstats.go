@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/kurojishi/procfs"
+	"github.com/jandre/procfs"
 )
 
 //Stats save stats gather information
@@ -27,9 +27,7 @@ func Stats(pid int, ticker *time.Ticker) error {
 		if err != nil {
 			return err
 		}
-
-		cputime := pstats.Utime.Sub(pstats.Starttime) + pstats.Stime.Sub(pstats.Starttime)
-		log.Printf("Polling vde_switch data %v: cputime: %v memory: %v context_switches: %v threads: %v", cputime/time.Second, pstatsm.Size, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
+		log.Printf("Polling vde_switch data: cputime: %v memory: %v context_switches: %v threads: %v", pstats.Utime+pstats.Stime, pstatsm.Size, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
 	}
 
 	return nil
