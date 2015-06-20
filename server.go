@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/tatsushid/go-fastping"
@@ -40,6 +41,7 @@ var devZero = &zeroFile{}
 
 func sendControlSignal(address string, msg int32) error {
 	conn, err := net.Dial("tcp", address)
+	defer conn.Close()
 	if err != nil {
 		return err
 	}
@@ -59,31 +61,49 @@ func signalLoop(control string, cch chan int32) {
 	}
 }
 
-func bandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
-	sync := make(chan int32)
+func devNullConnection(conn net.Conn, deliver chan int64) {
+
+	nbytes, err := io.Copy(devNull, conn)
+	if err != nil {
+		log.Fatalf("data receive error: %v", err)
+	}
+	deliver <- nbytes
+	return
+}
+
+//BandwidthTest is..
+func BandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
+	log.Printf("Starting bandwidth test")
+	sync := make(chan int32, 1)
 	go TCPStats(iface, snaplen, port, sync)
 	<-sync
-	ticker := PollStats(pid)
+	ticker, sch := PollStats(pid, "bandwidth")
 	listener, err := net.Listen("tcp", address)
+	defer listener.Close()
 	if err != nil {
 		log.Fatalf("ReceiveData %v", err)
 	}
 	cch <- bandwidth
 	conn, err := listener.Accept()
 	if err != nil {
-		log.Fatalf("connection error: %v", err)
+		log.Fatal(err)
 	}
+
 	_, err = io.Copy(devNull, conn)
-	ticker.Stop()
 	if err != nil {
 		log.Fatalf("data receive error: %v", err)
 	}
+	ticker.Stop()
+	sch <- true
+	close(sch)
+
 	<-sync
+	log.Print("Finished bandwidth test")
 
 }
 
-//TODO: save data to file
-func latencyTest(address string) {
+//LatencyTest use ping to control latency
+func LatencyTest(address string) {
 	rttch := make(chan time.Duration, 10)
 	ra, err := net.ResolveIPAddr("ip", address)
 	if err != nil {
@@ -110,5 +130,58 @@ func latencyTest(address string) {
 		log.Printf("Test ping:latency %v ms", (float32(rtt)/2)/float32(time.Millisecond))
 	}
 	log.Printf("Medium Latency is: %v", (float32(sum/2)/float32(i))/float32(time.Millisecond))
+
+}
+
+func manageConnections(address string, sch chan int32, deliver chan int64) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for {
+		select {
+		case <-sch:
+			log.Print("i'm out of this gorouitine")
+			return
+		default:
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Fatal(err)
+			}
+			go devNullConnection(conn, deliver)
+
+		}
+	}
+
+}
+
+//StressTest lauch a test to see what the vde_switch will do on very intensive traffic
+func StressTest(address string, startingPort int, cch chan int32) {
+	log.Print("Starting stress test")
+	schContainer := make([]chan int32, 0, 150)
+	ticker, sch := PollStats(pid, "bandwidth")
+	results := make(chan int64)
+	for i := 0; i < 150; i++ {
+		sch := make(chan int32)
+		finalAddr := address + ":" + strconv.Itoa(startingPort+i)
+		manageConnections(finalAddr, sch, results)
+		schContainer = append(schContainer, sch)
+
+	}
+	cch <- stress
+	timer := time.NewTimer(1 * time.Minute)
+	<-timer.C
+	for i := 0; i < len(schContainer); i++ {
+		schContainer[i] <- stop
+	}
+	ticker.Stop()
+	sch <- true
+	close(sch)
+	var dataReceived int64
+	for nbytes := range results {
+		dataReceived += nbytes
+	}
+	log.Printf("Received %v bytes", dataReceived)
+	log.Print("Finished stress test")
 
 }

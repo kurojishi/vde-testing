@@ -15,7 +15,7 @@ func main() {
 	var snaplen int64
 	var address, remote, iface string
 	flag.StringVar(&address, "addr", "192.168.4.1", "address to send the data too")
-	flag.IntVar(&port, "p", 5000, "starting port")
+	flag.IntVar(&port, "port", 5000, "starting port")
 	flag.BoolVar(&server, "server", false, "service will be a server")
 	flag.StringVar(&iface, "i", "tap0", "interface connected to the switch")
 	flag.Int64Var(&snaplen, "snaplen", 1600, "spanlen for pcap capture")
@@ -30,9 +30,8 @@ func main() {
 		}
 		cch := make(chan int32)
 		go signalLoop(remote+":8000", cch)
-		bandwidthTest(iface, sPort, fullAddr, snaplen, cch)
-		latencyTest(remote)
-		latencyTest(remote)
+		BandwidthTest(iface, sPort, fullAddr, snaplen, cch)
+		LatencyTest(remote)
 	} else {
 		controlServer(remote+":8000", fullAddr)
 	}
