@@ -132,4 +132,5 @@ func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
 	}
 	sync <- stop
 	log.Print("Catching finished")
+	close(sync)
 }

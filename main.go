@@ -4,7 +4,6 @@ import (
 	"flag"
 	"log"
 	"net"
-	"strconv"
 )
 
 var pid int
@@ -22,17 +21,17 @@ func main() {
 	flag.StringVar(&remote, "raddr", "192.168.4.15", "")
 	flag.IntVar(&pid, "pid", 0, "the vde switch pid")
 	flag.Parse()
-	fullAddr := address + ":" + strconv.Itoa(port)
 	if server {
-		sPort := strconv.Itoa(port)
 		if _, err := net.InterfaceByName(iface); err != nil {
 			log.Fatalf("Could Not find interface %v: %v", iface, err)
 		}
 		cch := make(chan int32)
+		defer close(cch)
 		go signalLoop(remote+":8000", cch)
-		BandwidthTest(iface, sPort, fullAddr, snaplen, cch)
-		LatencyTest(remote)
+		StressTest(address, port, cch)
+		//BandwidthTest(iface, sPort, fullAddr, snaplen, cch)
+		//LatencyTest(remote)
 	} else {
-		controlServer(remote+":8000", fullAddr)
+		controlServer(remote+":8000", address, port)
 	}
 }

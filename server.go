@@ -6,17 +6,19 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/tatsushid/go-fastping"
 )
 
 const (
-	bandwidth int32 = 1
-	latency   int32 = 2
-	load      int32 = 3
-	stress    int32 = 4
-	die       int32 = 0
+	bandwidth  int32 = 1
+	latency    int32 = 2
+	load       int32 = 3
+	stress     int32 = 4
+	stressStop int32 = 5
+	die        int32 = 0
 )
 
 const (
@@ -61,11 +63,14 @@ func signalLoop(control string, cch chan int32) {
 	}
 }
 
-func devNullConnection(conn net.Conn, deliver chan int64) {
+func devNullConnection(conn net.Conn, deliver chan int64, wg sync.WaitGroup) {
 
+	wg.Add(1)
+	defer wg.Done()
 	nbytes, err := io.Copy(devNull, conn)
 	if err != nil {
-		log.Fatalf("data receive error: %v", err)
+		log.Printf("data receive error: %v", err)
+		return
 	}
 	deliver <- nbytes
 	return
@@ -79,16 +84,16 @@ func BandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
 	<-sync
 	ticker, sch := PollStats(pid, "bandwidth")
 	listener, err := net.Listen("tcp", address)
-	defer listener.Close()
 	if err != nil {
 		log.Fatalf("ReceiveData %v", err)
 	}
+	defer listener.Close()
 	cch <- bandwidth
 	conn, err := listener.Accept()
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	defer conn.Close()
 	_, err = io.Copy(devNull, conn)
 	if err != nil {
 		log.Fatalf("data receive error: %v", err)
@@ -96,7 +101,6 @@ func BandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
 	ticker.Stop()
 	sch <- true
 	close(sch)
-
 	<-sync
 	log.Print("Finished bandwidth test")
 
@@ -133,50 +137,60 @@ func LatencyTest(address string) {
 
 }
 
-func manageConnections(address string, sch chan int32, deliver chan int64) {
+func manageConnections(address string, sch chan int32, deliver chan int64, wg sync.WaitGroup) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Manage Connections error: %v", err)
 	}
+	wg.Add(1)
+	defer wg.Done()
+	//defer listener.Close()
 	for {
 		select {
 		case <-sch:
-			log.Print("i'm out of this gorouitine")
 			return
 		default:
 			conn, err := listener.Accept()
+			//defer conn.Close()
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Manage Connections error 2: %v", err)
 			}
-			go devNullConnection(conn, deliver)
+			go devNullConnection(conn, deliver, wg)
 
 		}
 	}
+	log.Printf("Closing connection %v", address)
 
 }
 
 //StressTest lauch a test to see what the vde_switch will do on very intensive traffic
 func StressTest(address string, startingPort int, cch chan int32) {
 	log.Print("Starting stress test")
-	schContainer := make([]chan int32, 0, 150)
-	ticker, sch := PollStats(pid, "bandwidth")
+	schContainer := make([]chan int32, 0, 50)
+	ticker, sch := PollStats(pid, "stress")
 	results := make(chan int64)
-	for i := 0; i < 150; i++ {
-		sch := make(chan int32)
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		ssch := make(chan int32, 1)
 		finalAddr := address + ":" + strconv.Itoa(startingPort+i)
-		manageConnections(finalAddr, sch, results)
-		schContainer = append(schContainer, sch)
+		go manageConnections(finalAddr, ssch, results, wg)
+		schContainer = append(schContainer, ssch)
 
 	}
 	cch <- stress
 	timer := time.NewTimer(1 * time.Minute)
 	<-timer.C
+	log.Print("timer elapsed")
+	cch <- stressStop
 	for i := 0; i < len(schContainer); i++ {
 		schContainer[i] <- stop
 	}
 	ticker.Stop()
+	log.Print("Stopping ticker")
 	sch <- true
-	close(sch)
+	log.Print("Asking Threads to stop")
+	wg.Wait()
+	close(results)
 	var dataReceived int64
 	for nbytes := range results {
 		dataReceived += nbytes
