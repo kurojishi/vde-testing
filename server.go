@@ -63,16 +63,15 @@ func signalLoop(control string, cch chan int32) {
 	}
 }
 
-func devNullConnection(conn net.Conn, deliver chan int64, wg sync.WaitGroup) {
+func devNullConnection(conn net.Conn, wg sync.WaitGroup) {
 
 	wg.Add(1)
 	defer wg.Done()
-	nbytes, err := io.Copy(devNull, conn)
+	_, err := io.Copy(devNull, conn)
 	if err != nil {
 		log.Printf("data receive error: %v", err)
 		return
 	}
-	deliver <- nbytes
 	return
 }
 
@@ -137,7 +136,7 @@ func LatencyTest(address string) {
 
 }
 
-func manageConnections(address string, sch chan int32, deliver chan int64, wg sync.WaitGroup) {
+func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Manage Connections error: %v", err)
@@ -155,7 +154,7 @@ func manageConnections(address string, sch chan int32, deliver chan int64, wg sy
 			if err != nil {
 				log.Fatalf("Manage Connections error 2: %v", err)
 			}
-			go devNullConnection(conn, deliver, wg)
+			go devNullConnection(conn, wg)
 
 		}
 	}
@@ -168,12 +167,11 @@ func StressTest(address string, startingPort int, cch chan int32) {
 	log.Print("Starting stress test")
 	schContainer := make([]chan int32, 0, 50)
 	ticker, sch := PollStats(pid, "stress")
-	results := make(chan int64)
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
 		ssch := make(chan int32, 1)
 		finalAddr := address + ":" + strconv.Itoa(startingPort+i)
-		go manageConnections(finalAddr, ssch, results, wg)
+		go manageConnections(finalAddr, ssch, wg)
 		schContainer = append(schContainer, ssch)
 
 	}
@@ -190,12 +188,6 @@ func StressTest(address string, startingPort int, cch chan int32) {
 	sch <- true
 	log.Print("Asking Threads to stop")
 	wg.Wait()
-	close(results)
-	var dataReceived int64
-	for nbytes := range results {
-		dataReceived += nbytes
-	}
-	log.Printf("Received %v bytes", dataReceived)
 	log.Print("Finished stress test")
 
 }
