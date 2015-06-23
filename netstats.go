@@ -1,4 +1,4 @@
-package main
+package vdetesting
 
 import (
 	"log"
@@ -67,15 +67,24 @@ func (s *StatsStream) ReassemblyComplete() {
 	}
 }
 
-//TCPStats returns all the statistics from a series of streams on a specific interface
+//TCPStat is a stat implementation
+//for getting tcp statistic
+type TCPStat struct {
+	iface   string
+	port    Port
+	sync    chan int32
+	snaplen int
+}
+
+//Start returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
-func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
+func (t *TCPStat) Start() {
 	finished = false
 	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
 	}
-	log.Printf("starting capture on %v", iface)
+	log.Printf("starting capture on %v", t.iface)
 
 	//set up assembler
 
@@ -99,7 +108,7 @@ func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
 
 	var byteCount int64
 
-	handle, err := pcap.OpenLive(iface, int32(snaplen), true, flushDuration/2)
+	handle, err := pcap.OpenLive(t.iface, int32(t.snaplen), true, flushDuration/2)
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
 	}
@@ -109,7 +118,7 @@ func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
 	nextFlush := time.Now().Add(flushDuration / 2)
 
 	log.Println("Catching stream stats")
-	sync <- ready
+	t.sync <- ready
 	for !finished {
 		if time.Now().After(nextFlush) {
 			//log.Println("Flushing all streams that havent' seen packets")
@@ -126,11 +135,10 @@ func TCPStats(iface string, snaplen int64, port string, sync chan int32) {
 		}
 
 		byteCount += int64(len(packet.Data()))
-		if packet.TransportLayer().TransportFlow().Dst().String() == port {
+		if packet.TransportLayer().TransportFlow().Dst().String() == t.port.Int() {
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
-	sync <- stop
+	t.sync <- stop
 	log.Print("Catching finished")
-	close(sync)
 }
