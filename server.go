@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"io"
 	"log"
 	"net"
@@ -9,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kurojishi/vde-testing/utils"
 	"github.com/tatsushid/go-fastping"
 )
 
@@ -26,53 +26,13 @@ const (
 	ready int32 = 2
 )
 
-type zeroFile struct{}
-
-type nullFile struct{}
-
-func (d *nullFile) Write(p []byte) (int, error) {
-	return len(p), nil
-}
-
-func (d *zeroFile) Read(p []byte) (int, error) {
-	return len(p), nil
-}
-
-var devNull = &nullFile{}
-var devZero = &zeroFile{}
-
-func sendControlSignal(address string, msg int32) error {
-	conn, err := net.Dial("tcp", address)
-	defer conn.Close()
-	if err != nil {
-		return err
-	}
-	err = binary.Write(conn, binary.LittleEndian, msg)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func signalLoop(control string, cch chan int32) {
 	for msg := range cch {
-		err := sendControlSignal(control, msg)
+		err := utils.SendControlSignal(control, msg)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-}
-
-func devNullConnection(conn net.Conn, wg sync.WaitGroup) {
-
-	wg.Add(1)
-	defer wg.Done()
-	_, err := io.Copy(devNull, conn)
-	if err != nil {
-		log.Printf("data receive error: %v", err)
-		return
-	}
-	return
 }
 
 //BandwidthTest is..
@@ -154,7 +114,7 @@ func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {
 			if err != nil {
 				log.Fatalf("Manage Connections error 2: %v", err)
 			}
-			go devNullConnection(conn, wg)
+			go utils.DevNullConnection(conn, wg)
 
 		}
 	}
@@ -189,5 +149,4 @@ func StressTest(address string, startingPort int, cch chan int32) {
 	log.Print("Asking Threads to stop")
 	wg.Wait()
 	log.Print("Finished stress test")
-
 }
