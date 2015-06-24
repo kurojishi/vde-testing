@@ -3,6 +3,7 @@ package vdetesting
 import (
 	"net"
 	"strconv"
+	"sync"
 )
 
 //TestServer is the server side part of a test
@@ -10,7 +11,8 @@ import (
 type TestServer interface {
 	StartServer()
 	AddStat(s Stat)
-	NetworkInterface() *net.Interface
+	statManager()
+	IFace() *net.Interface
 }
 
 //TestClient is the Client side part of a test
@@ -54,4 +56,48 @@ func (p *Port) NextPort(int) Port {
 type Stat interface {
 	Start()
 	Stop()
+	SetWaitGroup(wg sync.WaitGroup)
+}
+
+//StatManager is a struct that should be added to everytest
+//it manage all the Stats inside them
+type StatManager struct {
+	stats []Stat
+	wg    sync.WaitGroup
+}
+
+//NewStatManager Create a NewStatManager, should be used inside tests
+func NewStatManager() StatManager {
+	var wg sync.WaitGroup
+	manager := StatManager{stats: make([]Stat, 0, 20),
+		wg: wg}
+	return manager
+}
+
+//Add new statistic fetcher to the manager
+func (manager *StatManager) Add(s Stat) {
+	s.SetWaitGroup(manager.wg)
+	manager.stats = append(manager.stats, s)
+}
+
+//Stats return the slice with all the Stats we fetch
+func (manager *StatManager) Stats() *[]Stat {
+	return &manager.stats
+}
+
+//Start start all the statistics
+func (manager *StatManager) Start() error {
+	for i := 0; i < len(manager.stats); i++ {
+		manager.stats[i].Start()
+	}
+	return nil
+}
+
+//Stop stop all the statistics and wait for them to finish
+//TODO: add waitgroup handling
+func (manager *StatManager) Stop() error {
+	for i := 0; i < len(manager.stats); i++ {
+		manager.stats[i].Stop()
+	}
+	return nil
 }

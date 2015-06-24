@@ -1,7 +1,9 @@
 package vdetesting
 
 import (
+	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -72,19 +74,42 @@ func (s *StatsStream) ReassemblyComplete() {
 type TCPStat struct {
 	iface   string
 	port    Port
-	sync    chan int32
+	sync    chan bool
 	snaplen int
+	logfile string
+	wg      *sync.WaitGroup
+}
+
+//SetWaitGroup add a wait group to the Stat
+//a wait group is used by the stat manager to correctly close and sync all the stats
+//before returing control to the test
+//return error if there is already a waitgroup setup
+func (s *TCPStat) SetWaitGroup(wg *sync.WaitGroup) error {
+	if s.wg != nil {
+		return errors.New("there is already a wait group")
+	}
+	s.wg = wg
+	return nil
+}
+
+//Stop send the signal to the stat manager to stop polling stats
+func (s *TCPStat) Stop() {
+	s.sync <- true
 }
 
 //Start returns all the statistics from a series of streams on a specific interface
 // iface is the network interface to sniff and snaplen is the window size
-func (t *TCPStat) Start() {
+func (s *TCPStat) Start() {
+	go s.ifacePoll()
+}
+
+func (s TCPStat) ifacePoll() {
 	finished = false
 	flushDuration, err := time.ParseDuration("1m")
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
 	}
-	log.Printf("starting capture on %v", t.iface)
+	log.Printf("starting capture on %v", s.iface)
 
 	//set up assembler
 
@@ -108,7 +133,7 @@ func (t *TCPStat) Start() {
 
 	var byteCount int64
 
-	handle, err := pcap.OpenLive(t.iface, int32(t.snaplen), true, flushDuration/2)
+	handle, err := pcap.OpenLive(s.iface, int32(s.snaplen), true, flushDuration/2)
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
 	}
@@ -118,7 +143,7 @@ func (t *TCPStat) Start() {
 	nextFlush := time.Now().Add(flushDuration / 2)
 
 	log.Println("Catching stream stats")
-	t.sync <- ready
+	s.sync <- true
 	for !finished {
 		if time.Now().After(nextFlush) {
 			//log.Println("Flushing all streams that havent' seen packets")
@@ -135,10 +160,10 @@ func (t *TCPStat) Start() {
 		}
 
 		byteCount += int64(len(packet.Data()))
-		if packet.TransportLayer().TransportFlow().Dst().String() == t.port.Int() {
+		if packet.TransportLayer().TransportFlow().Dst().String() == s.port.String() {
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
-	t.sync <- stop
+	s.sync <- true
 	log.Print("Catching finished")
 }

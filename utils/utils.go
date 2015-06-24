@@ -8,6 +8,12 @@ import (
 	"sync"
 )
 
+const (
+	kb int64 = 1000
+	mb int64 = 1000 * kb
+	gb int64 = 1000 * mb
+)
+
 type zeroFile struct{}
 
 type nullFile struct{}
@@ -25,9 +31,11 @@ var devZero = &zeroFile{}
 
 //DevNullConnection take a connection on the receive end, get all data
 //and put into an empty reader
-func DevNullConnection(conn net.Conn, wg sync.WaitGroup) {
-	wg.Add(1)
-	defer wg.Done()
+func DevNullConnection(conn net.Conn, wg *sync.WaitGroup) {
+	if wg != nil {
+		wg.Add(1)
+		defer wg.Done()
+	}
 	_, err := io.Copy(devNull, conn)
 	if err != nil {
 		log.Printf("data receive error: %v", err)
@@ -48,4 +56,22 @@ func SendControlSignal(address string, msg int32) error {
 		return err
 	}
 	return nil
+}
+
+//sendData send size data (in megabytes)to the string addr
+func SendData(addr string, size int64) {
+	_, err := net.ResolveTCPAddr("tcp", addr)
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	n, err := io.CopyN(conn, devZero, size*(mb))
+	if err != nil {
+		return
+	}
+	if n != size*mb {
+		log.Printf("couldnt send %v Megabytes", float64(n)/float64(mb))
+		return
+	}
 }

@@ -2,12 +2,13 @@ package vdetesting
 
 import (
 	"encoding/binary"
-	"io"
 	"log"
 	"math/rand"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/kurojishi/vdetesting/utils"
 )
 
 const (
@@ -38,7 +39,7 @@ func controlServer(bind, address string, port int) {
 		switch buf {
 		case bandwidth:
 			log.Print("Starting BandwidthTest")
-			sendData(address+":"+strconv.Itoa(port), 1000)
+			utils.SendData(address+":"+strconv.Itoa(port), 1000)
 		case die:
 			break
 		case stress:
@@ -54,27 +55,6 @@ func controlServer(bind, address string, port int) {
 		default:
 			continue
 		}
-	}
-}
-
-//sendData send size data (in megabytes)to the string addr
-func sendData(addr string, size int64) {
-	_, err := net.ResolveTCPAddr("tcp", addr)
-	conn, err := net.Dial("tcp", addr)
-	if err != nil {
-		log.Fatal(err)
-		//log.Printf("sendData: %v", err)
-		return
-	}
-	//defer conn.Close()
-	n, err := io.CopyN(conn, devZero, size*(mb))
-	if err != nil {
-		//log.Print(err)
-		return
-	}
-	if n != size*mb {
-		log.Printf("couldnt send %v Megabytes", float64(n)/float64(mb))
-		return
 	}
 }
 
@@ -94,7 +74,7 @@ func stressSend(address string, startingPort int) []chan int32 {
 					return
 				default:
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
-					sendData(finalAddr, sizes[r.Int31n(int32(len(sizes)-1))])
+					utils.SendData(finalAddr, sizes[r.Int31n(int32(len(sizes)-1))])
 				}
 			}
 		}(finalAddr, ssch)

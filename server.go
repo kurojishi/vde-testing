@@ -1,14 +1,13 @@
 package vdetesting
 
 import (
-	"io"
 	"log"
 	"net"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/kurojishi/vde-testing/utils"
+	"github.com/kurojishi/vdetesting/utils"
 	"github.com/tatsushid/go-fastping"
 )
 
@@ -33,36 +32,6 @@ func signalLoop(control string, cch chan int32) {
 			log.Fatal(err)
 		}
 	}
-}
-
-//BandwidthTest is..
-func BandwidthTest(iface, port, address string, snaplen int64, cch chan int32) {
-	log.Printf("Starting bandwidth test")
-	sync := make(chan int32, 1)
-	go TCPStats(iface, snaplen, port, sync)
-	<-sync
-	ticker, sch := PollStats(pid, "bandwidth")
-	listener, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatalf("ReceiveData %v", err)
-	}
-	defer listener.Close()
-	cch <- bandwidth
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-	_, err = io.Copy(devNull, conn)
-	if err != nil {
-		log.Fatalf("data receive error: %v", err)
-	}
-	ticker.Stop()
-	sch <- true
-	close(sch)
-	<-sync
-	log.Print("Finished bandwidth test")
-
 }
 
 //LatencyTest use ping to control latency
@@ -114,7 +83,7 @@ func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {
 			if err != nil {
 				log.Fatalf("Manage Connections error 2: %v", err)
 			}
-			go utils.DevNullConnection(conn, wg)
+			go utils.DevNullConnection(conn, &wg)
 
 		}
 	}
@@ -123,7 +92,7 @@ func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {
 }
 
 //StressTest lauch a test to see what the vde_switch will do on very intensive traffic
-func StressTest(address string, startingPort int, cch chan int32) {
+func StressTest(address string, startingPort int, cch chan int32, pid int) {
 	log.Print("Starting stress test")
 	schContainer := make([]chan int32, 0, 50)
 	ticker, sch := PollStats(pid, "stress")
