@@ -46,7 +46,7 @@ func DevNullConnection(conn net.Conn, wg *sync.WaitGroup) {
 
 //SendControlSignal send a message to a TCP address
 func SendControlSignal(address string, msg int32) error {
-	conn, err := net.Dial("tcp", address)
+	conn, err := net.Dial("tcp", address+":8999")
 	defer conn.Close()
 	if err != nil {
 		return err
@@ -58,7 +58,18 @@ func SendControlSignal(address string, msg int32) error {
 	return nil
 }
 
-//sendData send size data (in megabytes)to the string addr
+//SendControlSignalUntilOnline repeat SendControlSignal until no error return from Dial
+func SendControlSignalUntilOnline(address string, msg int32) {
+	for {
+		if err := SendControlSignal(address, msg); err != nil {
+			continue
+		} else {
+			break
+		}
+	}
+}
+
+//SendData send size data (in megabytes)to the string addr
 func SendData(addr string, size int64) {
 	_, err := net.ResolveTCPAddr("tcp", addr)
 	conn, err := net.Dial("tcp", addr)
