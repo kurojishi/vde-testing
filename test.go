@@ -56,21 +56,21 @@ func (p *Port) NextPort(int) Port {
 type Stat interface {
 	Start()
 	Stop()
-	SetWaitGroup(wg sync.WaitGroup)
+	SetWaitGroup(wg *sync.WaitGroup) error
 }
 
 //StatManager is a struct that should be added to everytest
 //it manage all the Stats inside them
 type StatManager struct {
 	stats []Stat
-	wg    sync.WaitGroup
+	wg    *sync.WaitGroup
 }
 
 //NewStatManager Create a NewStatManager, should be used inside tests
 func NewStatManager() StatManager {
 	var wg sync.WaitGroup
 	manager := StatManager{stats: make([]Stat, 0, 20),
-		wg: wg}
+		wg: &wg}
 	return manager
 }
 

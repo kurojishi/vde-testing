@@ -3,6 +3,7 @@ package vdetesting
 import (
 	"errors"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -72,12 +73,17 @@ func (s *StatsStream) ReassemblyComplete() {
 //TCPStat is a stat implementation
 //for getting tcp statistic
 type TCPStat struct {
-	iface   string
+	iface   *net.Interface
 	port    Port
 	sync    chan bool
 	snaplen int
 	logfile string
 	wg      *sync.WaitGroup
+}
+
+func NewTCPStat(iface *net.Interface, port Port, logfile string) TCPStat {
+	stat := TCPStat{iface: iface, port: port, logfile: logfile, snaplen: 1600}
+	return stat
 }
 
 //SetWaitGroup add a wait group to the Stat
@@ -126,14 +132,13 @@ func (s TCPStat) ifacePoll() {
 	var ip6 layers.IPv6
 	var ip6ext layers.IPv6ExtensionSkipper
 	var tcp layers.TCP
-	//var udp layers.UDP
 	var payload gopacket.Payload
 	parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &dot1q, &ip4, &ip6, &ip6ext, &tcp, &payload)
 	decoded := make([]gopacket.LayerType, 0, 8)
 
 	var byteCount int64
 
-	handle, err := pcap.OpenLive(s.iface, int32(s.snaplen), true, flushDuration/2)
+	handle, err := pcap.OpenLive(s.iface.Name, int32(s.snaplen), true, flushDuration/2)
 	if err != nil {
 		log.Fatal("error opening pcap handle: ", err)
 	}
@@ -143,7 +148,7 @@ func (s TCPStat) ifacePoll() {
 	nextFlush := time.Now().Add(flushDuration / 2)
 
 	log.Println("Catching stream stats")
-	s.sync <- true
+	s.wg.Add(1)
 	for !finished {
 		if time.Now().After(nextFlush) {
 			//log.Println("Flushing all streams that havent' seen packets")
@@ -164,6 +169,6 @@ func (s TCPStat) ifacePoll() {
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
-	s.sync <- true
+	s.wg.Done()
 	log.Print("Catching finished")
 }

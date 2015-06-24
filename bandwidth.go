@@ -9,6 +9,8 @@ import (
 	"github.com/kurojishi/vdetesting/utils"
 )
 
+//BandwidthTest is a Test that check the bandwidth
+//of  a connection
 type BandwidthTest struct {
 	iface   *net.Interface
 	address net.Addr
@@ -18,6 +20,7 @@ type BandwidthTest struct {
 	stats   StatManager
 }
 
+//NewBandwidthTest Return a new BandwidthTest
 func NewBandwidthTest(iface string, address string, port int) (*BandwidthTest, error) {
 	addr, err := net.ResolveIPAddr("tcp", address+":"+strconv.Itoa(port))
 	if err != nil {
@@ -33,9 +36,13 @@ func NewBandwidthTest(iface string, address string, port int) (*BandwidthTest, e
 		cch:     make(chan int32),
 		stats:   StatManager{stats: make([]Stat, 0, 20)},
 		name:    "bandwidth"}
+	logfile := bandwidth.name + ".log"
+	stat := NewTCPStat(bandwidth.iface, bandwidth.port, logfile)
+	bandwidth.AddStat(&stat)
 	return &bandwidth, nil
 }
 
+//AddStat Add a new Statistic
 func (t *BandwidthTest) AddStat(stat Stat) {
 	t.stats.Add(stat)
 
@@ -74,22 +81,27 @@ func (t *BandwidthTest) StartServer() {
 
 }
 
+//IFace Return the Interface
 func (t *BandwidthTest) IFace() *net.Interface {
 	return t.iface
 }
 
+//StartClient start the TestClient side of this Test
 func (t *BandwidthTest) StartClient() {
 	utils.SendData(t.address.String(), 1000)
 }
 
+//Name return the name of this test
 func (t *BandwidthTest) Name() string {
 	return t.name
 }
 
+//Port return the port this test will be performed on
 func (t *BandwidthTest) Port() Port {
 	return t.port
 }
 
+//Address return the IP address of the test
 func (t *BandwidthTest) Address() net.Addr {
 	return t.address
 }
