@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -14,7 +15,9 @@ import (
 )
 
 // simpleStreamFactory implements tcpassembly.StreamFactory
-type statsStreamFactory struct{}
+type statsStreamFactory struct {
+	logger *log.Logger
+}
 
 // StatsStream will handle the actual decoding of stats requests.
 type StatsStream struct {
@@ -22,6 +25,7 @@ type StatsStream struct {
 	bytes, packets, outOfOrder, skipped int64
 	start, end                          time.Time
 	sawStart, sawEnd                    bool
+	logger                              *log.Logger
 }
 
 var finished bool
@@ -34,6 +38,7 @@ func (factory *statsStreamFactory) New(net, transport gopacket.Flow) tcpassembly
 		net:       net,
 		transport: transport,
 		start:     time.Now(),
+		logger:    factory.logger,
 	}
 	s.end = s.start
 	// ReaderStream implements tcpassembly.Stream, so we can return a pointer to it.
@@ -65,7 +70,7 @@ func (s *StatsStream) ReassemblyComplete() {
 	//TODO: write this data to a file
 	if !finished {
 		diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
-		log.Printf("stream took %v seconds to complete, sent %v MB with a bitrate of %v MB", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
+		s.logger.Printf("%v %v %v", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
 		finished = true
 	}
 }
@@ -77,12 +82,25 @@ type TCPStat struct {
 	port    Port
 	sync    chan bool
 	snaplen int
-	logfile string
+	logger  *log.Logger
 	wg      *sync.WaitGroup
 }
 
+//NewTCPStat create  new tcp stat
 func NewTCPStat(iface *net.Interface, port Port, logfile string) TCPStat {
-	stat := TCPStat{iface: iface, port: port, logfile: logfile, snaplen: 1600}
+	if _, err := os.Stat(logfile); err == nil {
+		err := os.Remove(logfile)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	file, err := os.Create(logfile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	logger := log.New(file, "", 0)
+	stat := TCPStat{iface: iface, port: port, logger: logger, snaplen: 1600}
 	return stat
 }
 
@@ -119,7 +137,7 @@ func (s TCPStat) ifacePoll() {
 
 	//set up assembler
 
-	streamFactory := &statsStreamFactory{}
+	streamFactory := &statsStreamFactory{s.logger}
 	streamPool := tcpassembly.NewStreamPool(streamFactory)
 	assembler := tcpassembly.NewAssembler(streamPool)
 	assembler.MaxBufferedPagesTotal = 0
