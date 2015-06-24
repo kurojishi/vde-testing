@@ -2,9 +2,9 @@
 package vdetesting
 
 import (
+	"encoding/binary"
 	"log"
 	"net"
-	"strconv"
 
 	"github.com/kurojishi/vdetesting/utils"
 )
@@ -18,27 +18,36 @@ type BandwidthTest struct {
 	name    string
 	cch     chan int32
 	stats   StatManager
+	kind    string
 }
 
 //NewBandwidthTest Return a new BandwidthTest
-func NewBandwidthTest(iface string, address string, port int) (*BandwidthTest, error) {
-	addr, err := net.ResolveIPAddr("tcp", address+":"+strconv.Itoa(port))
+func NewBandwidthTest(kind string, iface string, address string, port int) (*BandwidthTest, error) {
+	addr, err := net.ResolveIPAddr("ip", address)
 	if err != nil {
 		return nil, err
 	}
-	face, err := net.InterfaceByName(iface)
-	if err != nil {
-		return nil, err
+	var face *net.Interface
+	if kind == "server" {
+		face, err = net.InterfaceByName(iface)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		face = nil
 	}
 	bandwidth := BandwidthTest{iface: face,
 		address: addr,
 		port:    Port{port},
 		cch:     make(chan int32),
 		stats:   StatManager{stats: make([]Stat, 0, 20)},
+		kind:    kind,
 		name:    "bandwidth"}
 	logfile := bandwidth.name + ".log"
-	stat := NewTCPStat(bandwidth.iface, bandwidth.port, logfile)
-	bandwidth.AddStat(&stat)
+	if kind == "server" {
+		stat := NewTCPStat(bandwidth.iface, bandwidth.port, logfile)
+		bandwidth.AddStat(&stat)
+	}
 	return &bandwidth, nil
 }
 
@@ -60,23 +69,23 @@ func (t *BandwidthTest) statisticsStop() {
 //StartServer start the server side of Bandwidthtest
 func (t *BandwidthTest) StartServer() {
 	log.Printf("Starting bandwidth test")
-	//go TCPStats(iface, snaplen, port, sync)
-	//ticker, sch := PollStats(pid, "bandwidth")
-	listener, err := net.Listen("tcp", t.address.String())
+	err := t.stats.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", t.address.String()+":"+t.port.String())
 	if err != nil {
 		log.Fatalf("ReceiveData %v", err)
 	}
 	defer listener.Close()
-	t.cch <- bandwidth
+	go utils.SendControlSignalUntilOnline(t.address.String(), 1)
 	conn, err := listener.Accept()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
 	utils.DevNullConnection(conn, nil)
-	//ticker.Stop()
-	//sch <- true
-	//close(sch)
+	t.stats.Stop()
 	log.Print("Finished bandwidth test")
 
 }
@@ -88,6 +97,24 @@ func (t *BandwidthTest) IFace() *net.Interface {
 
 //StartClient start the TestClient side of this Test
 func (t *BandwidthTest) StartClient() {
+	var arrived = false
+	clistener, err := net.Listen("tcp", t.address.String()+":8999")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for !arrived {
+		conn, err := clistener.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
+		var buf int32
+		binary.Read(conn, binary.LittleEndian, &buf)
+		if buf == 1 {
+			arrived = true
+			clistener.Close()
+		}
+		conn.Close()
+	}
 	utils.SendData(t.address.String(), 1000)
 }
 

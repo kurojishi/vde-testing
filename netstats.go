@@ -67,11 +67,9 @@ func (s *StatsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
 // ReassemblyComplete is called when the TCP assembler believes a stream has
 // finished.
 func (s *StatsStream) ReassemblyComplete() {
-	//TODO: write this data to a file
 	if !finished {
 		diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
 		s.logger.Printf("%v %v %v", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
-		finished = true
 	}
 }
 
@@ -119,6 +117,7 @@ func (s *TCPStat) SetWaitGroup(wg *sync.WaitGroup) error {
 //Stop send the signal to the stat manager to stop polling stats
 func (s *TCPStat) Stop() {
 	s.sync <- true
+	close(s.sync)
 }
 
 //Start returns all the statistics from a series of streams on a specific interface
@@ -187,6 +186,7 @@ func (s TCPStat) ifacePoll() {
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
+	<-s.sync
 	s.wg.Done()
 	log.Print("Catching finished")
 }

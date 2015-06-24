@@ -94,10 +94,10 @@ func (manager *StatManager) Start() error {
 }
 
 //Stop stop all the statistics and wait for them to finish
-//TODO: add waitgroup handling
 func (manager *StatManager) Stop() error {
-	for i := 0; i < len(manager.stats); i++ {
+	for i := 0; i < len(manager.stats)-1; i++ {
 		manager.stats[i].Stop()
 	}
+	manager.wg.Wait()
 	return nil
 }
