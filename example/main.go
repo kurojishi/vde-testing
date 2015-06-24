@@ -17,7 +17,6 @@ func main() {
 	flag.IntVar(&port, "port", 5000, "starting port")
 	flag.BoolVar(&server, "server", false, "service will be a server")
 	flag.StringVar(&iface, "i", "tap0", "interface connected to the switch")
-	flag.Int64Var(&snaplen, "snaplen", 1600, "spanlen for pcap capture")
 	flag.StringVar(&remote, "raddr", "192.168.4.15", "")
 	flag.IntVar(&pid, "pid", 0, "the vde switch pid")
 	flag.Parse()
