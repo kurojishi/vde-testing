@@ -19,8 +19,8 @@ type statsStreamFactory struct {
 	logger *log.Logger
 }
 
-// StatsStream will handle the actual decoding of stats requests.
-type StatsStream struct {
+// statsStream will handle the actual decoding of stats requests.
+type statsStream struct {
 	net, transport                      gopacket.Flow
 	bytes, packets, outOfOrder, skipped int64
 	start, end                          time.Time
@@ -34,7 +34,7 @@ var finished bool
 // it isn't currently following.
 func (factory *statsStreamFactory) New(net, transport gopacket.Flow) tcpassembly.Stream {
 	//TODO:remove this print
-	s := &StatsStream{
+	s := &statsStream{
 		net:       net,
 		transport: transport,
 		start:     time.Now(),
@@ -47,7 +47,7 @@ func (factory *statsStreamFactory) New(net, transport gopacket.Flow) tcpassembly
 
 // Reassembled is called whenever new packet data is available for reading.
 // Reassembly objects contain stream data IN ORDER.
-func (s *StatsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
+func (s *statsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
 	for _, reassembly := range reassemblies {
 		if reassembly.Seen.Before(s.end) {
 			s.outOfOrder++
@@ -66,7 +66,7 @@ func (s *StatsStream) Reassembled(reassemblies []tcpassembly.Reassembly) {
 
 // ReassemblyComplete is called when the TCP assembler believes a stream has
 // finished.
-func (s *StatsStream) ReassemblyComplete() {
+func (s *statsStream) ReassemblyComplete() {
 	if !finished {
 		diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
 		s.logger.Printf("%v %v %v", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
