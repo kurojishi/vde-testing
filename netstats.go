@@ -71,6 +71,7 @@ func (s *StatsStream) ReassemblyComplete() {
 		diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
 		s.logger.Printf("%v %v %v", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
 		log.Printf("%v %v %v", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
+		finished = true
 	}
 }
 
@@ -187,7 +188,6 @@ func (s TCPStat) ifacePoll() {
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
-	log.Println("OUT OF THERE")
 	<-s.sync
 	s.wg.Done()
 	log.Print("Catching finished")
