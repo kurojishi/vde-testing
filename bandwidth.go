@@ -19,10 +19,11 @@ type BandwidthTest struct {
 	cch     chan int32
 	stats   StatManager
 	kind    string
+	pid     int
 }
 
 //NewBandwidthTest Return a new BandwidthTest
-func NewBandwidthTest(kind string, iface string, address string, port int) (*BandwidthTest, error) {
+func NewBandwidthTest(kind string, iface string, address string, port int, pid int) (*BandwidthTest, error) {
 	addr, err := net.ResolveIPAddr("ip", address)
 	if err != nil {
 		return nil, err
@@ -35,6 +36,7 @@ func NewBandwidthTest(kind string, iface string, address string, port int) (*Ban
 		}
 	} else {
 		face = nil
+		pid = 0
 	}
 	bandwidth := BandwidthTest{iface: face,
 		address: addr,
@@ -42,11 +44,13 @@ func NewBandwidthTest(kind string, iface string, address string, port int) (*Ban
 		cch:     make(chan int32),
 		stats:   NewStatManager(),
 		kind:    kind,
+		pid:     pid,
 		name:    "bandwidth"}
-	logfile := bandwidth.name + ".log"
 	if kind == "server" {
-		stat := NewTCPStat(bandwidth.iface, bandwidth.port, logfile)
-		bandwidth.AddStat(&stat)
+		//tcpStat := NewTCPStat(bandwidth.iface, bandwidth.port, bandwidth.name)
+		//bandwidth.AddStat(&tcpStat)
+		pstat := NewProfilingStat(bandwidth.pid, bandwidth.name)
+		bandwidth.AddStat(&pstat)
 	}
 	return &bandwidth, nil
 }
@@ -69,10 +73,6 @@ func (t *BandwidthTest) statisticsStop() {
 //StartServer start the server side of Bandwidthtest
 func (t *BandwidthTest) StartServer() {
 	log.Printf("Starting bandwidth test")
-	err := t.stats.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
 	bind, err := utils.InterfaceAddrv4(t.iface)
 	listener, err := net.Listen("tcp", bind+":"+t.port.String())
 	if err != nil {
@@ -80,13 +80,14 @@ func (t *BandwidthTest) StartServer() {
 	}
 	defer listener.Close()
 	go utils.SendControlSignal(t.address.String(), 1)
+	t.statisticsStart()
 	conn, err := listener.Accept()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
 	utils.DevNullConnection(conn, nil)
-	t.stats.Stop()
+	t.statisticsStop()
 	log.Print("Finished bandwidth test")
 
 }
@@ -119,8 +120,6 @@ func (t *BandwidthTest) StartClient() error {
 			arrived = true
 			clistener.Close()
 			log.Printf("control message arrived")
-		} else {
-			log.Print(buf)
 		}
 	}
 	log.Print("control message arrived sending data")

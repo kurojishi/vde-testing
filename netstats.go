@@ -88,6 +88,7 @@ type TCPStat struct {
 
 //NewTCPStat create  new tcp stat
 func NewTCPStat(iface *net.Interface, port Port, logfile string) TCPStat {
+	logfile += "net.log"
 	if _, err := os.Stat(logfile); err == nil {
 		err := os.Remove(logfile)
 		if err != nil {

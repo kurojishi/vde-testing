@@ -1,58 +1,96 @@
 package vdetesting
 
 import (
+	"errors"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/jandre/procfs"
 )
 
-//Stats save stats gather information
-//on on the pid process using the proc filesystem
-func Stats(pid int, ticker *time.Ticker, stop chan bool, testname string) error {
-	if _, err := os.Stat(testname + "stats"); err == nil {
-		err := os.Remove(testname + "stats")
+//ProfilingStat implement Stat
+//And it's used to fetch profiling data from /proc
+type ProfilingStat struct {
+	pid    int
+	wg     *sync.WaitGroup
+	sync   chan bool
+	logger *log.Logger
+	ticker *time.Ticker
+}
+
+//NewProfilingStat create  new stat for profiling a process using /proc
+func NewProfilingStat(pid int, logfile string) ProfilingStat {
+	logfile += "profiling.log"
+	if _, err := os.Stat(logfile); err == nil {
+		err := os.Remove(logfile)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-	logfile, err := os.Create(testname + "stats")
-	defer log.Println("Finished Polling Stats")
+
+	file, err := os.Create(logfile)
 	if err != nil {
 		log.Fatal(err)
 	}
-	logger := log.New(logfile, "", 0)
-	for {
-		select {
-		case <-ticker.C:
+	logger := log.New(file, "", 0)
+	sync := make(chan bool, 1)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	stat := ProfilingStat{pid: pid, logger: logger, sync: sync, ticker: ticker}
+	return stat
+}
 
-			process, err := procfs.NewProcess(pid, true)
-			if err != nil {
-				return err
-			}
-			pstats, err := process.Stat()
-			if err != nil {
-				return err
-			}
-			pstatus, err := process.Status()
-			if err != nil {
-				return err
-			}
-			logger.Printf("%v %v %v %v", pstats.Utime+pstats.Stime, pstats.Vsize, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
-		case <-stop:
-			return nil
-
-		}
+//SetWaitGroup add a wait group to the Stat
+//a wait group is used by the stat manager to correctly close and sync all the stats
+//before returing control to the test
+//return error if there is already a waitgroup setup
+func (stat *ProfilingStat) SetWaitGroup(wg *sync.WaitGroup) error {
+	if stat.wg != nil {
+		return errors.New("there is already a wait group")
 	}
-
+	stat.wg = wg
 	return nil
 }
 
-//PollStats call Stats every tick and close it when it's done
-func PollStats(pid int, testname string) (*time.Ticker, chan bool) {
-	stop := make(chan bool, 1)
-	ticker := time.NewTicker(500 * time.Millisecond)
-	go Stats(pid, ticker, stop, testname)
-	return ticker, stop
+//Stats save stats gather information
+//on on the pid process using the proc filesystem
+func (stat *ProfilingStat) stats() {
+	stat.wg.Add(1)
+	for {
+		select {
+		case <-stat.ticker.C:
+			process, err := procfs.NewProcess(stat.pid, true)
+			if err != nil {
+				log.Fatal(err)
+			}
+			pstats, err := process.Stat()
+			if err != nil {
+				log.Fatal(err)
+			}
+			pstatus, err := process.Status()
+			if err != nil {
+				log.Fatal(err)
+			}
+			stat.logger.Printf("%v %v %v %v", pstats.Utime+pstats.Stime, pstats.Vsize, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
+			log.Printf("%v %v %v %v", pstats.Utime+pstats.Stime, pstats.Vsize, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
+		case <-stat.sync:
+			stat.wg.Done()
+			return
+		}
+	}
+	log.Println("Finished Polling Stats")
+}
+
+//Start start ProfilingStat
+func (stat *ProfilingStat) Start() {
+	go stat.stats()
+}
+
+//Stop send the signal to to the goroutine to stop
+func (stat *ProfilingStat) Stop() {
+	stat.ticker.Stop()
+	stat.sync <- true
+	close(stat.sync)
+	log.Print("stopped profiling stat")
 }

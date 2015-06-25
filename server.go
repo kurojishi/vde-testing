@@ -95,7 +95,7 @@ func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {
 func StressTest(address string, startingPort int, cch chan int32, pid int) {
 	log.Print("Starting stress test")
 	schContainer := make([]chan int32, 0, 50)
-	ticker, sch := PollStats(pid, "stress")
+	//ticker, sch := PollStats(pid, "stress")
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
 		ssch := make(chan int32, 1)
@@ -112,9 +112,9 @@ func StressTest(address string, startingPort int, cch chan int32, pid int) {
 	for i := 0; i < len(schContainer); i++ {
 		schContainer[i] <- stop
 	}
-	ticker.Stop()
+	//ticker.Stop()
 	log.Print("Stopping ticker")
-	sch <- true
+	//sch <- true
 	log.Print("Asking Threads to stop")
 	wg.Wait()
 	log.Print("Finished stress test")
