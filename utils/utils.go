@@ -2,10 +2,12 @@ package utils
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 const (
@@ -46,8 +48,8 @@ func DevNullConnection(conn net.Conn, wg *sync.WaitGroup) {
 
 //SendControlSignal send a message to a TCP address
 func SendControlSignal(address string, msg int32) error {
+	log.Printf("sending control message to %v", address+":8999")
 	conn, err := net.Dial("tcp", address+":8999")
-	defer conn.Close()
 	if err != nil {
 		return err
 	}
@@ -62,8 +64,10 @@ func SendControlSignal(address string, msg int32) error {
 func SendControlSignalUntilOnline(address string, msg int32) {
 	for {
 		if err := SendControlSignal(address, msg); err != nil {
+			time.Sleep(1 * time.Second)
 			continue
 		} else {
+			log.Print("control message delivered")
 			break
 		}
 	}
@@ -85,4 +89,52 @@ func SendData(addr string, size int64) {
 		log.Printf("couldnt send %v Megabytes", float64(n)/float64(mb))
 		return
 	}
+}
+
+//Localv4Addr get the first local ipv4 address that is not loopback
+func Localv4Addr() (string, error) {
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4 != nil {
+			return ipnet.IP.String(), nil
+		}
+	}
+	err = errors.New("No non local Ip adress found")
+	return "", err
+}
+
+//Localv6Addr get the first local ipv4 address that is not loopback
+func Localv6Addr() (string, error) {
+
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4 == nil {
+			return ipnet.IP.String(), nil
+		}
+	}
+	err = errors.New("No non local Ip adress found")
+	return "", err
+}
+
+//InterfaceAddrv4 Get the ipv4 address of a specific interaface
+func InterfaceAddrv4(iface *net.Interface) (string, error) {
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4 == nil {
+			return ipnet.IP.String(), nil
+		}
+	}
+	err = errors.New("No non local Ip adress found")
+	return "", err
 }

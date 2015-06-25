@@ -40,7 +40,7 @@ func NewBandwidthTest(kind string, iface string, address string, port int) (*Ban
 		address: addr,
 		port:    Port{port},
 		cch:     make(chan int32),
-		stats:   StatManager{stats: make([]Stat, 0, 20)},
+		stats:   NewStatManager(),
 		kind:    kind,
 		name:    "bandwidth"}
 	logfile := bandwidth.name + ".log"
@@ -73,12 +73,13 @@ func (t *BandwidthTest) StartServer() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	listener, err := net.Listen("tcp", t.address.String()+":"+t.port.String())
+	bind, err := utils.InterfaceAddrv4(t.iface)
+	listener, err := net.Listen("tcp", bind+":"+t.port.String())
 	if err != nil {
 		log.Fatalf("ReceiveData %v", err)
 	}
 	defer listener.Close()
-	go utils.SendControlSignalUntilOnline(t.address.String(), 1)
+	go utils.SendControlSignal(t.address.String(), 1)
 	conn, err := listener.Accept()
 	if err != nil {
 		log.Fatal(err)
@@ -96,26 +97,35 @@ func (t *BandwidthTest) IFace() *net.Interface {
 }
 
 //StartClient start the TestClient side of this Test
-func (t *BandwidthTest) StartClient() {
+func (t *BandwidthTest) StartClient() error {
 	var arrived = false
-	clistener, err := net.Listen("tcp", t.address.String()+":8999")
+	local, err := utils.Localv4Addr()
+	if err != nil {
+		return err
+	}
+	clistener, err := net.Listen("tcp", local+":8999")
+	log.Printf("waiting control message for bandwidth test on %v", local+":8999")
 	if err != nil {
 		log.Fatal(err)
 	}
 	for !arrived {
 		conn, err := clistener.Accept()
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		var buf int32
 		binary.Read(conn, binary.LittleEndian, &buf)
 		if buf == 1 {
 			arrived = true
 			clistener.Close()
+			log.Printf("control message arrived")
+		} else {
+			log.Print(buf)
 		}
-		conn.Close()
 	}
-	utils.SendData(t.address.String(), 1000)
+	log.Print("control message arrived sending data")
+	utils.SendData(t.address.String()+":"+t.port.String(), 1000)
+	return nil
 }
 
 //Name return the name of this test

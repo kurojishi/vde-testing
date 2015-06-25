@@ -70,6 +70,7 @@ func (s *StatsStream) ReassemblyComplete() {
 	if !finished {
 		diffSecs := float64(s.end.Sub(s.start)) / float64(time.Second)
 		s.logger.Printf("%v %v %v", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
+		log.Printf("%v %v %v", diffSecs, float64(s.bytes)/float64(1000000), (float64(s.bytes)/float64(1000000))/diffSecs)
 	}
 }
 
@@ -98,7 +99,8 @@ func NewTCPStat(iface *net.Interface, port Port, logfile string) TCPStat {
 		log.Fatal(err)
 	}
 	logger := log.New(file, "", 0)
-	stat := TCPStat{iface: iface, port: port, logger: logger, snaplen: 1600}
+	sync := make(chan bool, 1)
+	stat := TCPStat{iface: iface, port: port, logger: logger, snaplen: 1600, sync: sync}
 	return stat
 }
 
@@ -132,7 +134,7 @@ func (s TCPStat) ifacePoll() {
 	if err != nil {
 		log.Fatal("invalid flush duration", err)
 	}
-	log.Printf("starting capture on %v", s.iface)
+	log.Printf("starting capture on %v", s.iface.Name)
 
 	//set up assembler
 
@@ -168,7 +170,6 @@ func (s TCPStat) ifacePoll() {
 	s.wg.Add(1)
 	for !finished {
 		if time.Now().After(nextFlush) {
-			//log.Println("Flushing all streams that havent' seen packets")
 			assembler.FlushOlderThan(time.Now().Add(flushDuration))
 			nextFlush = time.Now().Add(flushDuration / 2)
 		}
@@ -186,6 +187,7 @@ func (s TCPStat) ifacePoll() {
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), &tcp, packet.Metadata().Timestamp)
 		}
 	}
+	log.Println("OUT OF THERE")
 	<-s.sync
 	s.wg.Done()
 	log.Print("Catching finished")

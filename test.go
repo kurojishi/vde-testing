@@ -1,6 +1,7 @@
 package vdetesting
 
 import (
+	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -87,17 +88,18 @@ func (manager *StatManager) Stats() *[]Stat {
 
 //Start start all the statistics
 func (manager *StatManager) Start() error {
-	for i := 0; i < len(manager.stats); i++ {
-		manager.stats[i].Start()
+	for _, stat := range manager.stats {
+		stat.Start()
 	}
 	return nil
 }
 
 //Stop stop all the statistics and wait for them to finish
 func (manager *StatManager) Stop() error {
-	for i := 0; i < len(manager.stats)-1; i++ {
-		manager.stats[i].Stop()
+	for _, stat := range manager.stats {
+		stat.Stop()
 	}
+	log.Print("waiting for stats to stop")
 	manager.wg.Wait()
 	return nil
 }

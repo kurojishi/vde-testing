@@ -3,7 +3,8 @@ package main
 import (
 	"flag"
 	"log"
-	"net"
+
+	"github.com/kurojishi/vdetesting"
 )
 
 var pid int
@@ -11,26 +12,24 @@ var pid int
 func main() {
 	var server bool
 	var port int
-	var snaplen int64
-	var address, remote, iface string
-	flag.StringVar(&address, "addr", "192.168.4.1", "address to send the data too")
+	var remote, iface string
+	flag.StringVar(&remote, "remote", "192.168.4.1", "address to send the data too")
 	flag.IntVar(&port, "port", 5000, "starting port")
 	flag.BoolVar(&server, "server", false, "service will be a server")
 	flag.StringVar(&iface, "i", "tap0", "interface connected to the switch")
-	flag.StringVar(&remote, "raddr", "192.168.4.15", "")
 	flag.IntVar(&pid, "pid", 0, "the vde switch pid")
 	flag.Parse()
 	if server {
-		if _, err := net.InterfaceByName(iface); err != nil {
-			log.Fatalf("Could Not find interface %v: %v", iface, err)
+		btest, err := vdetesting.NewBandwidthTest("server", iface, remote, port)
+		if err != nil {
+			log.Fatal(err)
 		}
-		cch := make(chan int32)
-		defer close(cch)
-		go signalLoop(remote+":8000", cch)
-		StressTest(address, port, cch)
-		//BandwidthTest(iface, sPort, fullAddr, snaplen, cch)
-		//LatencyTest(remote)
+		btest.StartServer()
 	} else {
-		controlServer(remote+":8000", address, port)
+		btest, err := vdetesting.NewBandwidthTest("client", iface, remote, port)
+		if err != nil {
+			log.Fatal(err)
+		}
+		btest.StartClient()
 	}
 }
