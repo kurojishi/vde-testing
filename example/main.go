@@ -25,6 +25,8 @@ func main() {
 			log.Fatal(err)
 		}
 		btest.StartServer()
+		logger, err := vdetesting.NewLatencyTest(iface, remote)
+		logger.StartServer()
 	} else {
 		btest, err := vdetesting.NewBandwidthTest("client", iface, remote, port, pid)
 		if err != nil {

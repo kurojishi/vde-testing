@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/kurojishi/vdetesting/utils"
-	"github.com/tatsushid/go-fastping"
 )
 
 const (
@@ -32,37 +31,6 @@ func signalLoop(control string, cch chan int32) {
 			log.Fatal(err)
 		}
 	}
-}
-
-//LatencyTest use ping to control latency
-func LatencyTest(address string) {
-	rttch := make(chan time.Duration, 10)
-	ra, err := net.ResolveIPAddr("ip", address)
-	if err != nil {
-		log.Fatal(err)
-	}
-	pinger := fastping.NewPinger()
-	pinger.AddIPAddr(ra)
-	pinger.OnRecv = func(addr *net.IPAddr, rtt time.Duration) {
-		rttch <- rtt
-
-	}
-	//set message size to 64 byte
-	pinger.Size = 64
-	for i := 0; i < 10; i++ {
-		pinger.Run()
-	}
-	close(rttch)
-
-	var sum time.Duration
-	var i int
-	for rtt := range rttch {
-		sum += rtt
-		i++
-		log.Printf("Test ping:latency %v ms", (float32(rtt)/2)/float32(time.Millisecond))
-	}
-	log.Printf("Medium Latency is: %v", (float32(sum/2)/float32(i))/float32(time.Millisecond))
-
 }
 
 func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {

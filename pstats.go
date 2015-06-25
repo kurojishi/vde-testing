@@ -73,7 +73,7 @@ func (stat *ProfilingStat) stats() {
 				log.Fatal(err)
 			}
 			stat.logger.Printf("%v %v %v %v", pstats.Utime+pstats.Stime, pstats.Vsize, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
-			log.Printf("%v %v %v %v", pstats.Utime+pstats.Stime, pstats.Vsize, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
+			//log.Printf("%v %v %v %v", pstats.Utime+pstats.Stime, pstats.Vsize, pstatus.NVcswitch+pstatus.Vcswitch, pstats.NumThreads)
 		case <-stat.sync:
 			stat.wg.Done()
 			return

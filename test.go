@@ -14,22 +14,15 @@ type TestServer interface {
 	AddStat(s Stat)
 	statManager()
 	IFace() *net.Interface
-}
-
-//TestClient is the Client side part of a test
-//it should send data and publish an method to use in a cycle
-type TestClient interface {
-	StartClient()
+	Name() string
+	Address() net.Addr
 }
 
 //Test is a generic test it need a client method and a server method
 // and it test one single aspect and save the results to a single logfile
 type Test interface {
-	TestClient
+	startClient()
 	TestServer
-	Name() string
-	Address() net.Addr
-	Port() Port
 }
 
 //Port is a Network Port that Contains the port number
