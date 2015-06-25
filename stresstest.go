@@ -13,7 +13,7 @@ import (
 
 var sizes = []int64{10, 30, 50, 100, 200, 500}
 
-func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {
+func manageConnections(address string, sch chan bool, wg sync.WaitGroup) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Manage Connections error: %v", err)
@@ -42,23 +42,21 @@ func manageConnections(address string, sch chan int32, wg sync.WaitGroup) {
 //StressTest lauch a test to see what the vde_switch will do on very intensive traffic
 func StressTest(address string, startingPort int, cch chan int32, pid int) {
 	log.Print("Starting stress test")
-	schContainer := make([]chan int32, 0, 50)
+	schContainer := make([]chan bool, 0, 50)
 	//ticker, sch := PollStats(pid, "stress")
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
-		ssch := make(chan int32, 1)
+		ssch := make(chan bool, 1)
 		finalAddr := address + ":" + strconv.Itoa(startingPort+i)
 		go manageConnections(finalAddr, ssch, wg)
 		schContainer = append(schContainer, ssch)
 
 	}
-	cch <- stress
 	timer := time.NewTimer(1 * time.Minute)
 	<-timer.C
 	log.Print("timer elapsed")
-	cch <- stressStop
 	for i := 0; i < len(schContainer); i++ {
-		schContainer[i] <- stop
+		schContainer[i] <- true
 	}
 	//ticker.Stop()
 	log.Print("Stopping ticker")
