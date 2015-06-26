@@ -31,7 +31,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		stest.StartClient()
+		stest.StartServer()
 	} else {
 		//btest, err := vdetesting.NewBandwidthTest("client", iface, remote, port, pid)
 		//if err != nil {

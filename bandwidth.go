@@ -96,7 +96,10 @@ func (t *BandwidthTest) StartServer() {
 		log.Fatalf("Could not bind to listener %v", err)
 	}
 	defer listener.Close()
-	go utils.SendControlSignal(t.address.String(), 1)
+	err = utils.SendControlSignal(t.address.String(), 1)
+	if err != nil {
+		log.Fatal(err)
+	}
 	t.statisticsStart()
 	conn, err := listener.Accept()
 	if err != nil {
