@@ -102,6 +102,9 @@ func SendControlSignalUntilOnline(address string, msg int32) {
 //SendData send size data (in megabytes)to the string addr
 func SendData(addr string, size int64) error {
 	_, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return err
+	}
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return err
