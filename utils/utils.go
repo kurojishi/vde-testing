@@ -33,17 +33,16 @@ var devZero = &zeroFile{}
 
 //DevNullConnection take a connection on the receive end, get all data
 //and put into an empty reader
-func DevNullConnection(conn net.Conn, wg *sync.WaitGroup) {
+func DevNullConnection(conn net.Conn, wg *sync.WaitGroup) error {
 	if wg != nil {
 		wg.Add(1)
 		defer wg.Done()
 	}
 	_, err := io.Copy(devNull, conn)
 	if err != nil {
-		log.Printf("data receive error: %v", err)
-		return
+		return err
 	}
-	return
+	return nil
 }
 
 //WaitForControlMessage open a listener on port 8999 to get control messages
@@ -101,20 +100,21 @@ func SendControlSignalUntilOnline(address string, msg int32) {
 }
 
 //SendData send size data (in megabytes)to the string addr
-func SendData(addr string, size int64) {
+func SendData(addr string, size int64) error {
 	_, err := net.ResolveTCPAddr("tcp", addr)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	n, err := io.CopyN(conn, devZero, size*(mb))
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if n != size*mb {
 		log.Printf("couldnt send %v Megabytes", float64(n)/float64(mb))
-		log.Fatal(err)
+		return nil
 	}
+	return nil
 }
 
 //Localv4Addr get the first local ipv4 address that is not loopback
