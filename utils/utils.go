@@ -66,7 +66,6 @@ func WaitForControlMessage(msg int) error {
 		if buf == 2 {
 			arrived = true
 			clistener.Close()
-			log.Printf("control message arrived")
 		}
 	}
 	return nil

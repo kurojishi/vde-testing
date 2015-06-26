@@ -93,28 +93,31 @@ func (t *StressTest) Address() net.Addr {
 }
 
 //manageConnection open all the connections on a single port
-func (t *StressTest) manageConnections(port Port, sch chan bool, listenGroup sync.WaitGroup) {
-	listener, err := net.Listen("tcp", t.address.String())
+func (t *StressTest) manageConnections(address string, port Port, sch chan bool, listenGroup sync.WaitGroup) {
+	listener, err := net.Listen("tcp", address+":"+port.String())
 	if err != nil {
 		log.Fatalf("Manage Connections error: %v", err)
 	}
 	listenGroup.Add(1)
 	defer listenGroup.Done()
-	//defer listener.Close()
 	for {
 		select {
 		case <-sch:
+			log.Printf("i'm in there motherfuckers")
 			return
 		default:
 			conn, err := listener.Accept()
 			if err != nil {
 				log.Fatalf("Manage Connections error 2: %v", err)
 			}
-			go utils.DevNullConnection(conn, &listenGroup)
+			err = utils.DevNullConnection(conn, &listenGroup)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 		}
 	}
-	log.Printf("Closing connection %v", t.address.String())
+	log.Printf("Closing connection %v", address)
 
 }
 
@@ -124,17 +127,23 @@ func (t *StressTest) StartServer() {
 	schContainer := make([]chan bool, 0, 50)
 	var listenGroup sync.WaitGroup
 	t.statisticsStart()
+	laddr, err := utils.InterfaceAddrv4(t.iface)
 	for i := 0; i < 50; i++ {
 		ssch := make(chan bool, 1)
-		go t.manageConnections(t.port.NextPort(i), ssch, listenGroup)
+		go t.manageConnections(laddr, t.port.NextPort(i), ssch, listenGroup)
 		schContainer = append(schContainer, ssch)
 
 	}
+	log.Println("Send start signal to client")
+	err = utils.SendControlSignal(t.address.String(), 2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	timer := time.NewTimer(1 * time.Minute)
 	<-timer.C
-	go utils.SendControlSignal(t.address.String(), 2)
+	err = utils.SendControlSignal(t.address.String(), 2)
 	log.Println("sent stop message to client")
-	err := utils.WaitForControlMessage(2)
+	err = utils.WaitForControlMessage(2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -169,19 +178,28 @@ func (t *StressTest) StartClient() {
 					return
 				default:
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
-					utils.SendData(finalAddr, sizes[r.Int31n(int32(len(sizes)-1))])
+					err = utils.SendData(finalAddr, sizes[r.Int31n(int32(len(sizes)-1))])
+					if err != nil {
+						log.Fatal(err)
+					}
 				}
 			}
 		}(finalAddr, ssch)
 	}
+	log.Println("Waiting for stop message")
 	err = utils.WaitForControlMessage(2)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println("Stop Message arrived")
 	for _, cch := range controlChannels {
 		cch <- true
 		close(cch)
 	}
 	sendGroup.Wait()
-	utils.SendControlSignal(t.address.String(), 2)
+	log.Println("sending stop signal")
+	err = utils.SendControlSignal(t.address.String(), 2)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
