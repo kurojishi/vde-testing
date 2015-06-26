@@ -138,3 +138,30 @@ func InterfaceAddrv4(iface *net.Interface) (string, error) {
 	err = errors.New("No non local Ip adress found")
 	return "", err
 }
+
+//WaitForControlMessage open a listener on port 8999 to get control messages
+func WaitForControlMessage(msg int) error {
+	var arrived = false
+	local, err := Localv4Addr()
+	if err != nil {
+		return err
+	}
+	clistener, err := net.Listen("tcp", local+":8999")
+	if err != nil {
+		return err
+	}
+	for !arrived {
+		conn, err := clistener.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
+		var buf int32
+		binary.Read(conn, binary.LittleEndian, &buf)
+		if buf == 2 {
+			arrived = true
+			clistener.Close()
+			log.Printf("control message arrived")
+		}
+	}
+	return nil
+}
