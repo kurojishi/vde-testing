@@ -4,7 +4,6 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -13,13 +12,94 @@ import (
 
 var sizes = []int64{10, 30, 50, 100, 200, 500}
 
-func manageConnections(address string, sch chan bool, wg sync.WaitGroup) {
-	listener, err := net.Listen("tcp", address)
+//StressTest is used for profiling and it's main use
+//is to check how vde works under heavy loads
+type StressTest struct {
+	name    string
+	iface   *net.Interface
+	stats   StatManager
+	kind    string
+	pid     int
+	port    Port
+	address net.Addr
+	sync    chan bool
+}
+
+//NewStressTest Return a new StressTest
+func NewStressTest(kind string, iface string, address string, port int, pid int) (*StressTest, error) {
+	addr, err := net.ResolveIPAddr("ip", address)
+	if err != nil {
+		return nil, err
+	}
+	var face *net.Interface
+	if kind == "server" {
+		face, err = net.InterfaceByName(iface)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		face = nil
+		pid = 0
+	}
+	stress := StressTest{iface: face,
+		address: addr,
+		port:    Port{port},
+		stats:   NewStatManager(),
+		kind:    kind,
+		pid:     pid,
+		name:    "stress"}
+	if kind == "server" {
+		//tcpStat := NewTCPStat(stress.iface, stress.port, stress.name)
+		//stress.AddStat(&tcpStat)
+		pstat := NewProfilingStat(stress.pid, stress.name)
+		stress.AddStat(&pstat)
+	}
+	return &stress, nil
+}
+
+//AddStat Add a new Statistic
+func (t *StressTest) AddStat(stat Stat) {
+	t.stats.Add(stat)
+
+}
+
+func (t *StressTest) statisticsStart() {
+	t.stats.Start()
+
+}
+
+func (t *StressTest) statisticsStop() {
+	t.stats.Stop()
+}
+
+//IFace Return the Interface
+func (t *StressTest) IFace() *net.Interface {
+	return t.iface
+}
+
+//Name return the name of this test
+func (t *StressTest) Name() string {
+	return t.name
+}
+
+//Port return the port this test will be performed on
+func (t *StressTest) Port() Port {
+	return t.port
+}
+
+//Address return the IP address of the test
+func (t *StressTest) Address() net.Addr {
+	return t.address
+}
+
+//manageConnection open all the connections on a single port
+func (t *StressTest) manageConnections(port Port, sch chan bool, listenGroup sync.WaitGroup) {
+	listener, err := net.Listen("tcp", t.address.String())
 	if err != nil {
 		log.Fatalf("Manage Connections error: %v", err)
 	}
-	wg.Add(1)
-	defer wg.Done()
+	listenGroup.Add(1)
+	defer listenGroup.Done()
 	//defer listener.Close()
 	for {
 		select {
@@ -27,58 +107,65 @@ func manageConnections(address string, sch chan bool, wg sync.WaitGroup) {
 			return
 		default:
 			conn, err := listener.Accept()
-			//defer conn.Close()
 			if err != nil {
 				log.Fatalf("Manage Connections error 2: %v", err)
 			}
-			go utils.DevNullConnection(conn, &wg)
+			go utils.DevNullConnection(conn, &listenGroup)
 
 		}
 	}
-	log.Printf("Closing connection %v", address)
+	log.Printf("Closing connection %v", t.address.String())
 
 }
 
-//StressTest lauch a test to see what the vde_switch will do on very intensive traffic
-func StressTest(address string, startingPort int, cch chan int32, pid int) {
+//StartServer lauch a test to see what the vde_switch will do on very intensive traffic
+func (t *StressTest) StartServer() {
 	log.Print("Starting stress test")
 	schContainer := make([]chan bool, 0, 50)
-	//ticker, sch := PollStats(pid, "stress")
-	var wg sync.WaitGroup
+	var listenGroup sync.WaitGroup
+	t.statisticsStart()
 	for i := 0; i < 50; i++ {
 		ssch := make(chan bool, 1)
-		finalAddr := address + ":" + strconv.Itoa(startingPort+i)
-		go manageConnections(finalAddr, ssch, wg)
+		go t.manageConnections(t.port.NextPort(i), ssch, listenGroup)
 		schContainer = append(schContainer, ssch)
 
 	}
 	timer := time.NewTimer(1 * time.Minute)
 	<-timer.C
-	log.Print("timer elapsed")
+	go utils.SendControlSignal(t.address.String(), 2)
+	log.Println("sent stop message to client")
+	err := utils.WaitForControlMessage(2)
+	if err != nil {
+		log.Fatal(err)
+	}
 	for i := 0; i < len(schContainer); i++ {
 		schContainer[i] <- true
 	}
-	//ticker.Stop()
-	log.Print("Stopping ticker")
-	//sch <- true
-	log.Print("Asking Threads to stop")
-	wg.Wait()
+	listenGroup.Wait()
+	t.statisticsStop()
 	log.Print("Finished stress test")
 }
 
-//composition of sendData
-func stressSend(address string, startingPort int) []chan int32 {
-	controlChannels := make([]chan int32, 0, 50)
+//StartClient is a composition of sendData
+func (t *StressTest) StartClient() {
+	var sendGroup sync.WaitGroup
+	err := utils.WaitForControlMessage(2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("control message arrived sending data")
+	controlChannels := make([]chan bool, 0, 50)
 	for i := 0; i < 50; i++ {
-		ssch := make(chan int32)
+		ssch := make(chan bool)
 		controlChannels = append(controlChannels, ssch)
-
-		finalAddr := address + ":" + strconv.Itoa(startingPort+i)
-		go func(finalAddr string, ssch chan int32) {
-
+		port := t.port.NextPort(i)
+		finalAddr := t.address.String() + ":" + port.String()
+		go func(finalAddr string, ssch chan bool) {
+			sendGroup.Add(1)
 			for {
 				select {
 				case <-ssch:
+					sendGroup.Done()
 					return
 				default:
 					r := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -86,8 +173,15 @@ func stressSend(address string, startingPort int) []chan int32 {
 				}
 			}
 		}(finalAddr, ssch)
-
 	}
-	return controlChannels
-
+	err = utils.WaitForControlMessage(2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, cch := range controlChannels {
+		cch <- true
+		close(cch)
+	}
+	sendGroup.Wait()
+	utils.SendControlSignal(t.address.String(), 2)
 }
