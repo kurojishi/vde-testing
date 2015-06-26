@@ -41,8 +41,8 @@ func (p *Port) Int() int {
 }
 
 //NextPort return you the next port in order
-func (p *Port) NextPort(int) Port {
-	next := Port{p.port + 1}
+func (p *Port) NextPort(i int) Port {
+	next := Port{p.port + i}
 	return next
 }
 
