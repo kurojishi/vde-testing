@@ -142,8 +142,8 @@ func (t *StressTest) StartServer() {
 	timer := time.NewTimer(1 * time.Minute)
 	<-timer.C
 	err = utils.SendControlSignal(t.address.String(), 2)
-	log.Println("sent stop message to client")
-	err = utils.WaitForControlMessage(2)
+	log.Println("sent stop message to client waiting for confirmation")
+	err = utils.WaitForControlMessage(laddr, 2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -154,50 +154,55 @@ func (t *StressTest) StartServer() {
 	t.statisticsStop()
 	log.Print("Finished stress test")
 }
+func (t *StressTest) sendRandomAmoutOfData(finalAddr string, ssch chan bool, sendGroup sync.WaitGroup) {
+	sendGroup.Add(1)
+	defer sendGroup.Done()
+	for {
+		select {
+		case <-ssch:
+			log.Printf("I'm here stopping %v goroutine", finalAddr)
+			return
+		default:
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			err := utils.SendData(finalAddr, sizes[r.Int31n(int32(len(sizes)-1))])
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+}
 
 //StartClient is a composition of sendData
 func (t *StressTest) StartClient() {
 	var sendGroup sync.WaitGroup
-	err := utils.WaitForControlMessage(2)
+	local, err := utils.Localv4Addr()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = utils.WaitForControlMessage(local, 2)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Print("control message arrived sending data")
 	controlChannels := make([]chan bool, 0, 50)
 	for i := 0; i < 50; i++ {
-		ssch := make(chan bool)
+		ssch := make(chan bool, 1)
 		controlChannels = append(controlChannels, ssch)
 		port := t.port.NextPort(i)
 		finalAddr := t.address.String() + ":" + port.String()
-		go func(finalAddr string, ssch chan bool) {
-			sendGroup.Add(1)
-			for {
-				select {
-				case <-ssch:
-					sendGroup.Done()
-					return
-				default:
-					r := rand.New(rand.NewSource(time.Now().UnixNano()))
-					err = utils.SendData(finalAddr, sizes[r.Int31n(int32(len(sizes)-1))])
-					if err != nil {
-						log.Fatal(err)
-					}
-				}
-			}
-		}(finalAddr, ssch)
+		go t.sendRandomAmoutOfData(finalAddr, ssch, sendGroup)
 	}
 	log.Println("Waiting for stop message")
-	err = utils.WaitForControlMessage(2)
+	err = utils.WaitForControlMessage(local, 2)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Stop Message arrived")
 	for _, cch := range controlChannels {
 		cch <- true
 		close(cch)
 	}
 	sendGroup.Wait()
-	log.Println("sending stop signal")
+	log.Println("Sending stop signal")
 	err = utils.SendControlSignal(t.address.String(), 2)
 	if err != nil {
 		log.Fatal(err)

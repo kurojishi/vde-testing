@@ -52,7 +52,6 @@ func WaitForControlMessage(address string, msg int) error {
 	if err != nil {
 		return err
 	}
-	log.Println("launched listener")
 	for !arrived {
 		conn, err := clistener.Accept()
 		if err != nil {
@@ -61,7 +60,6 @@ func WaitForControlMessage(address string, msg int) error {
 		var buf int32
 		binary.Read(conn, binary.LittleEndian, &buf)
 		if buf == 2 {
-			log.Panicln("Control message arrived")
 			arrived = true
 			clistener.Close()
 		}
@@ -152,6 +150,7 @@ func Localv6Addr() (string, error) {
 }
 
 //InterfaceAddrv4 Get the ipv4 address of a specific interaface
+//TODO: FIX THIS function this always return empty string and an error it works just because "" is an acceptable address to bind
 func InterfaceAddrv4(iface *net.Interface) (string, error) {
 	addrs, err := iface.Addrs()
 	if err != nil {
