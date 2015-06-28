@@ -20,24 +20,24 @@ func main() {
 	flag.IntVar(&pid, "pid", 0, "the vde switch pid")
 	flag.Parse()
 	if server {
-		//btest, err := vdetesting.NewBandwidthTest("server", iface, remote, port, pid)
-		//if err != nil {
-		//log.Fatal(err)
-		//}
-		//btest.StartServer()
-		//logger, err := vdetesting.NewLatencyTest(iface, remote)
-		//logger.StartServer()
+		btest, err := vdetesting.NewBandwidthTest("server", iface, remote, port, pid)
+		if err != nil {
+			log.Fatal(err)
+		}
+		btest.StartServer()
+		logger, err := vdetesting.NewLatencyTest(iface, remote)
+		logger.StartServer()
 		stest, err := vdetesting.NewStressTest("server", iface, remote, port, pid)
 		if err != nil {
 			log.Fatal(err)
 		}
 		stest.StartServer()
 	} else {
-		//btest, err := vdetesting.NewBandwidthTest("client", iface, remote, port, pid)
-		//if err != nil {
-		//log.Fatal(err)
-		//}
-		//btest.StartClient()
+		btest, err := vdetesting.NewBandwidthTest("client", iface, remote, port, pid)
+		if err != nil {
+			log.Fatal(err)
+		}
+		btest.StartClient()
 		stest, err := vdetesting.NewStressTest("client", iface, remote, port, pid)
 		if err != nil {
 			log.Fatal(err)
