@@ -114,7 +114,11 @@ func (t *BandwidthTest) StartServer() {
 
 //StartClient start the TestClient side of this Test
 func (t *BandwidthTest) StartClient() {
-	err := utils.WaitForControlMessage(1)
+	local, err := utils.Localv4Addr()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = utils.WaitForControlMessage(local, 1)
 	if err != nil {
 		log.Fatal(err)
 	}

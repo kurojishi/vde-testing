@@ -46,16 +46,13 @@ func DevNullConnection(conn net.Conn, wg *sync.WaitGroup) error {
 }
 
 //WaitForControlMessage open a listener on port 8999 to get control messages
-func WaitForControlMessage(msg int) error {
+func WaitForControlMessage(address string, msg int) error {
 	var arrived = false
-	local, err := Localv4Addr()
+	clistener, err := net.Listen("tcp", address+":8999")
 	if err != nil {
 		return err
 	}
-	clistener, err := net.Listen("tcp", local+":8999")
-	if err != nil {
-		return err
-	}
+	log.Println("launched listener")
 	for !arrived {
 		conn, err := clistener.Accept()
 		if err != nil {
@@ -64,6 +61,7 @@ func WaitForControlMessage(msg int) error {
 		var buf int32
 		binary.Read(conn, binary.LittleEndian, &buf)
 		if buf == 2 {
+			log.Panicln("Control message arrived")
 			arrived = true
 			clistener.Close()
 		}
@@ -78,6 +76,7 @@ func SendControlSignal(address string, msg int32) error {
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	err = binary.Write(conn, binary.LittleEndian, msg)
 	if err != nil {
 		return err
@@ -108,6 +107,7 @@ func SendData(addr string, size int64) error {
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	n, err := io.CopyN(conn, devZero, size*(mb))
 	if err != nil {
 		return err
