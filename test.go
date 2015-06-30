@@ -1,6 +1,7 @@
 package vdetesting
 
 import (
+	"errors"
 	"log"
 	"net"
 	"sync"
@@ -34,15 +35,16 @@ type Stat interface {
 //StatManager is a struct that should be added to everytest
 //it manage all the Stats inside them
 type StatManager struct {
-	stats []Stat
-	wg    *sync.WaitGroup
+	stats   []Stat
+	wg      *sync.WaitGroup
+	started bool
 }
 
 //NewStatManager Create a NewStatManager, should be used inside tests
 func NewStatManager() StatManager {
 	var wg sync.WaitGroup
 	manager := StatManager{stats: make([]Stat, 0, 20),
-		wg: &wg}
+		wg: &wg, started: false}
 	return manager
 }
 
@@ -52,16 +54,16 @@ func (manager *StatManager) Add(s Stat) {
 	manager.stats = append(manager.stats, s)
 }
 
-//Stats return the slice with all the Stats we fetch
-func (manager *StatManager) Stats() *[]Stat {
-	return &manager.stats
-}
-
 //Start start all the statistics
 func (manager *StatManager) Start() error {
+	if manager.started {
+		err := errors.New("Statistics already Started")
+		return err
+	}
 	for _, stat := range manager.stats {
 		stat.Start()
 	}
+	manager.started = true
 	return nil
 }
 
@@ -72,5 +74,6 @@ func (manager *StatManager) Stop() error {
 	}
 	log.Print("waiting for stats to stop")
 	manager.wg.Wait()
+	manager.started = false
 	return nil
 }
