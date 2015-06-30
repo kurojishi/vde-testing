@@ -20,7 +20,7 @@ type TestServer interface {
 //Test is a generic test it need a client method and a server method
 // and it test one single aspect and save the results to a single logfile
 type Test interface {
-	startClient()
+	StartClient()
 	TestServer
 }
 
